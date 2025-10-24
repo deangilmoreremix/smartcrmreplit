@@ -1,0 +1,2 @@
+# smartcrmreplit
+Replit smartcrm deploy 
