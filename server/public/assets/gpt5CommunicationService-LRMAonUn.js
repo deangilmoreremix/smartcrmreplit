@@ -1,0 +1,19 @@
+import{bw as a,j as o}from"./index-e3V0CD7Y.js";const p=({appName:s,appDescription:e,children:t,actionButtons:n=[],headerStats:r})=>{const{isDark:i}=a();return o.jsxs(o.Fragment,{children:[o.jsx("div",{className:"bg-white dark:bg-gray-800 shadow-sm border-b",children:o.jsx("div",{className:"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",children:o.jsxs("div",{className:"flex justify-between items-start py-6",children:[o.jsxs("div",{className:"flex-1",children:[o.jsx("h1",{className:"text-3xl font-bold text-gray-900 dark:text-white",children:s}),o.jsx("p",{className:"text-gray-600 dark:text-gray-400 mt-2 max-w-2xl",children:e}),r&&o.jsx("div",{className:"mt-4",children:r})]}),n.length>0&&o.jsx("div",{className:"flex gap-3 ml-6",children:n})]})})}),o.jsx("main",{className:`w-full h-full overflow-y-auto px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 ${i?"bg-gray-900":"bg-gray-50"}`,children:o.jsx("div",{className:"max-w-7xl mx-auto space-y-8",children:t})})]})};class c{constructor(){this.baseUrl="/api/gpt5"}async generateContent(e){try{const t=await fetch(`${this.baseUrl}/generate`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(e)});if(!t.ok)throw new Error(`GPT-5 API error: ${t.status}`);return await t.json()}catch(t){return console.error("GPT-5 generation error:",t),{content:"AI generation temporarily unavailable. Please try again.",confidence:0,suggestions:[],metadata:{tone:"neutral",intent:"fallback",urgency:"low"}}}}async analyzeContent(e,t){try{const n=await fetch(`${this.baseUrl}/analyze`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({content:e,type:t})});if(!n.ok)throw new Error(`GPT-5 analysis error: ${n.status}`);return await n.json()}catch(n){return console.error("GPT-5 analysis error:",n),{sentiment:"neutral",intent:"unknown",keywords:[],urgency:"low",suggestions:[],score:.5}}}async optimizeContent(e,t){try{const n=await fetch(`${this.baseUrl}/optimize`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({content:e,goal:t})});if(!n.ok)throw new Error(`GPT-5 optimization error: ${n.status}`);return await n.json()}catch(n){return console.error("GPT-5 optimization error:",n),{optimizedContent:e,improvements:[],score:.5,recommendations:["Content optimization temporarily unavailable"]}}}async generateVideoScript(e){const t=`Generate a compelling video email script for:
+Recipient: ${e.recipient?.name||"Unknown"} (${e.recipient?.company||"Unknown Company"})
+Purpose: ${e.purpose}
+Tone: ${e.tone}
+Length: ${e.length} seconds
+
+Make it personalized, engaging, and professional.`;return this.generateContent({type:"video-script",context:t,recipient:e.recipient,goal:e.purpose,tone:e.tone,metadata:{length:e.length}})}async generateEmailResponse(e){const n=`Generate a professional email response based on this conversation:
+${e.conversation.map(r=>`${r.sender}: ${r.content}`).join(`
+`)}
+
+Respond as: Professional responding to ${e.recipient?.name||"recipient"}
+Tone: ${e.tone}`;return this.generateContent({type:"email",context:n,recipient:e.recipient,tone:e.tone})}async generateSMSReply(e){const t=`Generate a concise SMS reply to: "${e.message}"
+Context: ${e.context}
+Keep it under 160 characters. Tone: ${e.tone}`;return this.generateContent({type:"message",context:t,tone:e.tone,constraints:["max-160-chars"]})}async analyzeSentiment(e){return this.analyzeContent(e,"sentiment")}async generateMeetingSummary(e,t){const n=`Generate a comprehensive meeting summary from this transcript:
+${e}
+
+Attendees: ${t.join(", ")}
+
+Include: Key decisions, action items, and next steps.`;return this.generateContent({type:"meeting-summary",context:n,metadata:{attendees:t}})}async optimizeBusinessContent(e,t){return this.optimizeContent(e,`optimize-${t}`)}}const m=new c;export{p as C,m as g};

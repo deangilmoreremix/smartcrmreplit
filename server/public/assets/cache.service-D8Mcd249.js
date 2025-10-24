@@ -1,0 +1,1 @@
+const o={get(e,r){try{const a=localStorage.getItem(`${e}_${r}`);if(!a)return null;const t=JSON.parse(a);return t.expiry&&Date.now()>t.expiry?(localStorage.removeItem(`${e}_${r}`),null):t.data}catch{return null}},set(e,r,a,t,c){try{const n={data:a,expiry:t?Date.now()+t:null,tags:c||[]};localStorage.setItem(`${e}_${r}`,JSON.stringify(n))}catch{}}};export{o as c};

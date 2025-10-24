@@ -1,0 +1,360 @@
+To https://github.com/deangilmoreremix/smartcrmreplit.git
+ * [new branch]      work-in-progress -> work-in-progress
+~/workspace$ git push origin work-in-progress
+Everything up-to-date
+~/workspace$ git status
+On branch work-in-progress
+Last command done (1 command done):
+   pick d0d16dd Added Contacts copy copy.tsx
+Next commands to do (905 remaining commands):
+   pick 478f65d Added LeadAutomation copy.tsx
+   pick 95734e6 Added FAQ copy.tsx
+  (use "git rebase --edit-todo" to view and edit)
+You are currently rebasing branch 'main' on '84a2847'.
+  (fix conflicts and then run "git rebase --continue")
+  (use "git rebase --skip" to skip this patch)
+  (use "git rebase --abort" to check out the original branch)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+    new file:   .bolt/config.json
+    new file:   .bolt/prompt
+    new file:   .env.example
+    new file:   .gitignore
+    new file:   COMPLETION_SUMMARY.md
+    new file:   NEXT_STEPS.md
+    new file:   PHASE_2_ROADMAP.md
+    new file:   QUICK_START_GUIDE.md
+    new file:   eslint.config.js
+    new file:   index.html
+    new file:   netlify.toml
+    new file:   package-lock.json
+    new file:   package.json
+    new file:   packages/pipelinedeals2/package.json
+    new file:   postcss.config.js
+    new file:   public/android-chrome-192x192.png
+    new file:   public/android-chrome-512x512.png
+    new file:   public/icon.svg
+    new file:   src/App.tsx
+    new file:   src/components/AIAutomationDashboard.tsx
+    new file:   src/components/AIGoalsCard.tsx
+    new file:   src/components/AIModelSelector.tsx
+    new file:   src/components/AIModelUsageStats.tsx
+    new file:   src/components/AIToolsProvider.tsx
+    new file:   src/components/ActivityFeed.tsx
+    new file:   src/components/AdvancedFeaturesDashboard.tsx
+    new file:   src/components/AppointmentWidget.tsx
+    new file:   src/components/CallButton.tsx
+    new file:   src/components/CallRecording.tsx
+    new file:   src/components/ConnectionQuality.tsx
+    new file:   src/components/ContactCard.tsx
+    new file:   src/components/Dashboard.tsx
+    new file:   src/components/DashboardLayoutControls.tsx
+    new file:   src/components/DealAnalytics copy.tsx
+    new file:   src/components/DealAnalytics.tsx
+    new file:   src/components/DealDetail.tsx
+    new file:   src/components/DealDetailsModal.tsx
+    new file:   src/components/DealKanbanBoard.tsx
+    new file:   src/components/DemoAgentModal.tsx
+    new file:   src/components/DraggableSection.tsx
+    new file:   src/components/EmailComposer.tsx
+    new file:   src/components/EmailDashboard.tsx
+    new file:   src/components/InCallMessaging.tsx
+    new file:   src/components/IntelligentLeadAssistant.css
+    new file:   src/components/LeadsSection.tsx
+    new file:   src/components/ModalsProvider.tsx
+    new file:   src/components/Navbar.tsx
+    new file:   src/components/PartnerManagement.tsx
+    new file:   src/components/PersistentVideoCallButton.tsx
+    new file:   src/components/PipelineModal.tsx
+    new file:   src/components/PipelineStats.tsx
+    new file:   src/components/RevenueForecasting.tsx
+    new file:   src/components/RoleBasedAccess.tsx
+    new file:   src/components/SalesVelocityChart.tsx
+    new file:   src/components/TaskCalendar.tsx
+    new file:   src/components/TaskCard.tsx
+    new file:   src/components/TaskDetailsModal.tsx
+    new file:   src/components/TaskKanbanBoard.tsx
+    new file:   src/components/TasksSection.tsx
+    new file:   src/components/VideoCallOverlay.tsx
+    new file:   src/components/VideoCallPreviewWidget.tsx
+    new file:   src/components/ai/SmartAIControls.tsx
+    new file:   src/components/aiTools/AIAssistantChat.tsx
+    new file:   src/components/aiTools/AIUsageStatsPanel.tsx
+    new file:   src/components/aiTools/AutoFormCompleter.tsx
+    new file:   src/components/aiTools/CallScriptContent.tsx
+    new file:   src/components/aiTools/CallScriptGenerator.tsx
+    new file:   src/components/aiTools/ChurnPrediction.tsx
+    new file:   src/components/aiTools/CompetitorAnalysis.tsx
+    new file:   src/components/aiTools/CompetitorAnalysisContent.tsx
+    new file:   src/components/aiTools/CustomerPersonaContent copy copy.tsx
+    new file:   src/components/aiTools/CustomerPersonaContent copy.tsx
+    new file:   src/components/aiTools/CustomerPersonaContent.tsx
+    new file:   src/components/aiTools/DocumentAnalyzerRealtime.tsx
+    new file:   src/components/aiTools/EmailAnalysisContent.tsx
+    new file:   src/components/aiTools/EmailComposerContent copy copy.tsx
+    new file:   src/components/aiTools/EmailComposerContent copy.tsx
+    new file:   src/components/aiTools/EmailComposerContent.tsx
+    new file:   src/components/aiTools/EmailResponseContent copy.tsx
+    new file:   src/components/aiTools/EmailResponseContent.tsx
+    new file:   src/components/aiTools/FunctionAssistantContent copy.tsx
+    new file:   src/components/aiTools/FunctionAssistantContent.tsx
+    new file:   src/components/aiTools/ImageGeneratorContent copy.tsx
+    new file:   src/components/aiTools/ImageGeneratorContent.tsx
+    new file:   src/components/aiTools/InstantAIResponseGenerator.tsx
+    new file:   src/components/aiTools/LiveDealAnalysis copy copy.tsx
+    new file:   src/components/aiTools/LiveDealAnalysis copy.tsx
+    new file:   src/components/aiTools/LiveDealAnalysis.tsx
+    new file:   src/components/aiTools/MarketTrendContent copy.tsx
+    new file:   src/components/aiTools/MarketTrendContent.tsx
+    new file:   src/components/aiTools/MarketTrendsAnalysis.tsx
+    new file:   src/components/aiTools/MeetingAgendaContent copy copy.tsx
+    new file:   src/components/aiTools/MeetingAgendaContent copy.tsx
+    new file:   src/components/aiTools/MeetingAgendaContent.tsx
+    new file:   src/components/aiTools/MeetingSummaryContent.tsx
+    new file:   src/components/aiTools/ObjectionHandlerContent copy.tsx
+    new file:   src/components/aiTools/ObjectionHandlerContent.tsx
+    new file:   src/components/aiTools/ProposalGenerator.tsx
+    new file:   src/components/aiTools/RealTimeEmailComposer.tsx
+    new file:   src/components/aiTools/ReasoningObjectionHandler.tsx
+    new file:   src/components/aiTools/ReasoningProposalGenerator.tsx
+    new file:   src/components/aiTools/ReasoningScriptGenerator.tsx
+    new file:   src/components/aiTools/ReasoningSocialContent.tsx
+    new file:   src/components/aiTools/SentimentAnalysis.tsx
+    new file:   src/components/aiTools/SmartSearchRealtime.tsx
+    new file:   src/components/aiTools/SocialMediaGenerator.tsx
+    new file:   src/components/aiTools/VisualContentGeneratorContent.tsx
+    new file:   src/components/communications/CallLogging.tsx
+    new file:   src/components/communications/CommunicationHub.tsx
+    new file:   src/components/communications/ContactAutomation.tsx
+    new file:   src/components/communications/EmailComposer.tsx
+    new file:   src/components/communications/MeetingScheduler.tsx
+    new file:   src/components/contacts/AdvancedContactFilter.tsx
+    new file:   src/components/contacts/EnhancedContactCard.tsx
+    new file:   src/components/contacts/ProfessionalContactModal.tsx
+    new file:   src/components/dashboard/AIInsightsPanel.tsx
+    new file:   src/components/dashboard/ChartsSection.tsx
+    new file:   src/components/dashboard/ConnectedApps.tsx
+    new file:   src/components/dashboard/CustomerProfile.tsx
+    new file:   src/components/dashboard/DashboardHeader.tsx
+    new file:   src/components/dashboard/InteractionHistory.tsx
+    new file:   src/components/dashboard/KPICards.tsx
+    new file:   src/components/dashboard/MetricsCards.tsx
+    new file:   src/components/dashboard/NewLeadsSection.tsx
+    new file:   src/components/dashboard/QuickActions.tsx
+    new file:   src/components/dashboard/RecentActivity.tsx
+    new file:   src/components/dashboard/TasksAndFunnel.tsx
+    new file:   src/components/landing/AnimatedCounter.tsx
+    new file:   src/components/landing/AnimatedFeatureIcon.tsx
+    new file:   src/components/landing/ClientLogos.tsx
+    new file:   src/components/landing/FeatureDemo.tsx
+    new file:   src/components/landing/FeatureShowcase.tsx
+    new file:   src/components/landing/FloatingIcons.tsx
+    new file:   src/components/landing/InteractiveFeaturesGrid.tsx
+    new file:   src/components/landing/ParallaxHero.tsx
+    new file:   src/components/landing/ParticleBackground.tsx
+    new file:   src/components/landing/ProductDemo.tsx
+    new file:   src/components/landing/ScrollAnimationWrapper.tsx
+    new file:   src/components/landing/StatCounter.tsx
+    new file:   src/components/mobile/MobileResponsiveDashboard.tsx
+    new file:   src/components/modals/ContactsModal.tsx
+    new file:   src/components/sections/AISmartFeaturesHub.tsx
+    new file:   src/components/sections/ActivitiesCommunications.tsx
+    new file:   src/components/sections/CustomerLeadManagement.tsx
+    new file:   src/components/sections/ExecutiveOverviewSection.tsx
+    new file:   src/components/sections/IntegrationsSystem.tsx
+    new file:   src/components/sections/SalesPipelineDealAnalytics.tsx
+    new file:   src/components/shared/AIToolContent.tsx
+    new file:   src/components/shared/AIToolModal.tsx
+    new file:   src/components/shared/FileUpload.tsx
+    new file:   src/components/shared/ReasoningToggle.tsx
+    new file:   src/components/styles/design-system.css
+    new file:   src/components/ui/Avatar.tsx
+    new file:   src/components/ui/GlassCard.tsx
+    new file:   src/components/ui/LoadingSpinner.tsx
+    new file:   src/components/ui/ModernButton.tsx
+    new file:   src/components/ui/badge.tsx
+    new file:   src/components/ui/button.tsx
+    new file:   src/components/ui/calendar.tsx
+    new file:   src/components/ui/card.tsx
+    new file:   src/components/ui/dialog.tsx
+    new file:   src/components/ui/dropdown-menu.tsx
+    new file:   src/components/ui/input.tsx
+    new file:   src/components/ui/label.tsx
+    new file:   src/components/ui/popover.tsx
+    new file:   src/components/ui/select.tsx
+    new file:   src/components/ui/switch.tsx
+    new file:   src/components/ui/tabs.tsx
+    new file:   src/components/ui/textarea.tsx
+    new file:   src/config/api.config.ts
+    new file:   src/contexts/AIContext.tsx
+    new file:   src/contexts/DashboardLayoutContext.tsx
+    new file:   src/contexts/EnhancedHelpContext.tsx
+    new file:   src/contexts/NavigationContext.tsx
+    new file:   src/contexts/TenantProvider.tsx
+    new file:   src/contexts/ThemeContext.tsx
+    new file:   src/contexts/VideoCallContext.tsx
+    new file:   src/hooks/useAdvancedAI.ts
+    new file:   src/hooks/useContactStore.ts
+    new file:   src/hooks/useDarkMode.ts
+    new file:   src/hooks/useEmailAI.ts
+    new file:   src/hooks/useIntegration.ts
+    new file:   src/hooks/useOpenAIDemoAgent.ts
+    new file:   src/hooks/useSmartAI.ts
+    new file:   src/index.css
+    new file:   src/lib/supabase.ts
+    new file:   src/lib/utils.ts
+    new file:   src/main.tsx
+    new file:   src/pages/AIIntegration.tsx
+    new file:   src/pages/AITools copy copy.tsx
+    new file:   src/pages/AITools copy.tsx
+    new file:   src/pages/AITools.tsx
+    new file:   src/pages/Analytics.tsx
+    new file:   src/pages/AnalyticsDashboard.tsx
+    new file:   src/pages/Appointments copy.tsx
+    new file:   src/pages/Appointments.tsx
+    new file:   src/pages/CircleProspecting copy.tsx
+    new file:   src/pages/CircleProspecting.tsx
+    new file:   src/pages/Communication.tsx
+    new file:   src/pages/ContactDetail copy.tsx
+    new file:   src/pages/ContactDetail.tsx
+    new file:   src/pages/Contacts copy copy.tsx
+    new file:   src/pages/Contacts copy.tsx
+    new file:   src/pages/Contacts.tsx
+    new file:   src/pages/Dashboard copy copy.tsx
+    new file:   src/pages/Dashboard copy.tsx
+    new file:   src/pages/Dashboard.tsx
+    new file:   src/pages/DocumentCenter.tsx
+    new file:   src/pages/FAQ.tsx
+    new file:   src/pages/FormPublic copy.tsx
+    new file:   src/pages/FormPublic.tsx
+    new file:   src/pages/FormsAndSurveys.tsx
+    new file:   src/pages/GoalCardDemo.tsx
+    new file:   src/pages/Invoicing copy.tsx
+    new file:   src/pages/Invoicing.tsx
+    new file:   src/pages/LeadAutomation.tsx
+    new file:   src/pages/LeadCapture.tsx
+    new file:   src/pages/MobileResponsiveness.tsx
+    new file:   src/pages/PartnerDashboard.tsx
+    new file:   src/pages/PartnerManagementPage copy.tsx
+    new file:   src/pages/PartnerManagementPage.tsx
+    new file:   src/pages/PartnerOnboardingPage.tsx
+    new file:   src/pages/PhoneSystem copy.tsx
+    new file:   src/pages/PhoneSystem.tsx
+    new file:   src/pages/Pipeline copy.tsx
+    new file:   src/pages/Pipeline.tsx
+    new file:   src/pages/SalesTools copy.tsx
+    new file:   src/pages/SalesTools.tsx
+    new file:   src/pages/Settings.tsx
+    new file:   src/pages/SuperAdminDashboard.tsx
+    new file:   src/pages/SystemOverview.tsx
+    new file:   src/pages/TaskCalendarView copy.tsx
+    new file:   src/pages/TaskCalendarView.tsx
+    new file:   src/pages/Tasks copy copy.tsx
+    new file:   src/pages/Tasks copy.tsx
+    new file:   src/pages/Tasks.tsx
+    new file:   src/pages/TasksNew.tsx
+    new file:   src/pages/TextMessages copy.tsx
+    new file:   src/pages/TextMessages.tsx
+    new file:   src/pages/UnauthorizedPage.tsx
+    new file:   src/pages/UserManagement.tsx
+    new file:   src/pages/VideoEmail copy.css
+    new file:   src/pages/VideoEmail.css
+    new file:   src/pages/VideoEmail.tsx
+    new file:   src/pages/landing/FeaturePage/AiAssistantFeaturePage.tsx
+    new file:   src/pages/landing/FeaturePage/AiToolsFeaturePage.tsx
+    new file:   src/pages/landing/FeaturePage/ContactsFeaturePage.tsx
+    new file:   src/pages/landing/FeaturePage/FunctionAssistantFeaturePage.tsx
+    new file:   src/pages/landing/FeaturePage/ImageGeneratorFeaturePage.tsx
+    new file:   src/pages/landing/FeaturePage/PipelineFeaturePage.tsx
+    new file:   src/pages/landing/FeaturePage/SemanticSearchFeaturePage.tsx
+    new file:   src/pages/landing/FeaturePage/VisionAnalyzerFeaturePage.tsx
+    new file:   src/pages/landing/LandingPage.tsx
+    new file:   src/pages/landing/TestLandingPage.tsx
+    new file:   src/pages/landing/components/FeatureCard.tsx
+    new file:   src/pages/landing/components/LandingFooter.tsx
+    new file:   src/pages/landing/components/LandingHeader.tsx
+    new file:   src/pages/landing/components/PricingCard.tsx
+    new file:   src/pages/landing/components/TestimonialCard.tsx
+    new file:   src/sampleContacts.ts
+    new file:   src/services/ai-automation-engine.service.ts
+    new file:   src/services/ai-integration.service.ts
+    new file:   src/services/ai-intelligence-engine.service.ts
+    new file:   src/services/ai-orchestrator.service.ts
+    new file:   src/services/ai-predictive-analytics.service.ts
+    new file:   src/services/ai-task-queue.service.ts
+    new file:   src/services/aiEnrichmentService.ts
+    new file:   src/services/aiModels.ts
+    new file:   src/services/aiOrchestratorService.ts
+    new file:   src/services/aiUsageTracker.ts
+    new file:   src/services/cache.service.ts
+    new file:   src/services/communication-ai.service.ts
+    new file:   src/services/contact-ai.service.ts
+    new file:   src/services/contact-api.service.ts
+    new file:   src/services/dealService.ts
+    new file:   src/services/edgeFunctionService.ts
+    new file:   src/services/enhanced-ai-integration.service.ts
+    new file:   src/services/enhancedGeminiService.ts
+    new file:   src/services/geminiService.ts
+    new file:   src/services/http-client.service.ts
+    new file:   src/services/integration-manager.service.ts
+    new file:   src/services/logger.service.ts
+    new file:   src/services/openAIService.ts
+    new file:   src/services/openAiFunctionService.ts
+    new file:   src/services/openaiAssistantsService.ts
+    new file:   src/services/openaiEmbeddingsService copy.ts
+    new file:   src/services/openaiEmbeddingsService.ts
+    new file:   src/services/openaiImageService.ts
+    new file:   src/services/openaiService.ts
+    new file:   src/services/rate-limiter.service.ts
+    new file:   src/services/supabaseAIService.ts
+    new file:   src/services/supabaseClient.ts
+    new file:   src/services/task-router.service.ts
+    new file:   src/services/validation.service.ts
+    new file:   src/store/aiIntegrationStore.ts
+    new file:   src/store/analyticsStore.ts
+    new file:   src/store/appointmentStore.ts
+    new file:   src/store/communicationStore.ts
+    new file:   src/store/contactStore.ts
+    new file:   src/store/dealStore.ts
+    new file:   src/store/mobileStore.ts
+    new file:   src/store/taskStore.ts
+    new file:   src/types/aiIntegration.ts
+    new file:   src/types/analytics.ts
+    new file:   src/types/communication.ts
+    new file:   src/types/contact.ts
+    new file:   src/types/deal.ts
+    new file:   src/types/mobile.ts
+    new file:   src/types/task.ts
+    new file:   src/utils/avatars.ts
+    new file:   src/vite-env.d.ts
+    new file:   supabase/functions/analyze-sentiment/index.ts
+    new file:   supabase/functions/draft-email-response/index.ts
+    new file:   supabase/functions/generate-sales-pitch/index.ts
+    new file:   supabase/functions/natural-language-query/index.ts
+    new file:   supabase/functions/prioritize-tasks/index.ts
+    new file:   supabase/functions/summarize-customer-notes/index.ts
+    new file:   supabase/migrations/20250702123952_young_fog.sql
+    new file:   supabase/migrations/20250702132115_mellow_breeze.sql
+    new file:   tailwind.config.js
+    new file:   tsconfig.app.json
+    new file:   tsconfig.json
+    new file:   tsconfig.node.json
+    new file:   vite.config.ts
+
+Unmerged paths:
+  (use "git restore --staged <file>..." to unstage)
+  (use "git add <file>..." to mark resolution)
+    both added:      README.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+    .replit
+    client/
+    package.tmp
+    replit.md
+    server/
+    supabase/.temp/
+    vite.config.ts.backup
+    vite.config.ts.backup-final
+    vite.config.ts.temp

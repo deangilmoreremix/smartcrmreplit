@@ -1,0 +1,1 @@
+import{bw as s,bx as a,bj as l,j as e,by as t}from"./index-e3V0CD7Y.js";const c=()=>{const{isDark:o}=s(),{deals:i}=a(),{contacts:n}=l();return e.jsx("div",{className:"w-full overflow-hidden relative",style:{height:"calc(100vh - 80px)",paddingTop:"60px"},children:e.jsx("div",{className:"h-full w-full",children:e.jsx(t,{showHeader:!1})})})};export{c as default};

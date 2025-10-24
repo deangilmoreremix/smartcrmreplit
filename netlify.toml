@@ -1,0 +1,20 @@
+[build]
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[template.environment]
+  VITE_GOOGLE_AI_API_KEY = "Required Google AI API key for Gemini models"
+  VITE_OPENAI_API_KEY = "Optional OpenAI API key"
+  VITE_ANTHROPIC_API_KEY = "Optional Anthropic API key"
+
+[context.production]
+  # Production environment settings
+  environment = { NODE_ENV = "production", NPM_FLAGS = "" }
+
+[context.production.processing.html]
+  # Add placeholder replacement for environment variables
+  pretty_urls = true
+  transformers = ["./netlify/transforms/html.js"]
