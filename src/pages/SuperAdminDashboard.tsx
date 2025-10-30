@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { Shield, Users, Building2, DollarSign, Settings, CheckCircle, XCircle, Clock, Eye, Edit, Trash2, Plus } from 'lucide-react';
+import { Shield, Users, Building2, DollarSign, Settings, CheckCircle, XCircle, Clock, Eye, Edit, Trash2, Plus, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useAuditLogger } from '../hooks/useAuditLogger';
+import { useRateLimiter } from '../hooks/useRateLimiter';
+import { TenantTable } from '../components/admin/TenantTable';
+import { Pagination } from '../components/admin/Pagination';
 
 interface Tenant {
   id: string;
@@ -26,6 +32,10 @@ interface PlatformStats {
 }
 
 export default function SuperAdminDashboard() {
+  const { user, isAuthenticated, hasRole, hasPermission } = useAuth();
+  const navigate = useNavigate();
+  const { logTenantAction, logPartnerAction } = useAuditLogger();
+  const { executeWithRateLimit } = useRateLimiter({ maxRequests: 10, windowMs: 60000 }); // 10 actions per minute
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [pendingPartners, setPendingPartners] = useState<Tenant[]>([]);
@@ -33,30 +43,66 @@ export default function SuperAdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [updatingTenant, setUpdatingTenant] = useState<string | null>(null);
+  const [approvingPartner, setApprovingPartner] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<Tenant>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
+    // Check authentication and permissions
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    if (!hasRole('super_admin')) {
+      navigate('/unauthorized');
+      return;
+    }
+
     fetchAdminData();
-  }, []);
+  }, [isAuthenticated, hasRole, navigate]);
 
   const fetchAdminData = async () => {
     try {
-      // Fetch all tenants
-      const tenantsResponse = await fetch('/api/white-label/tenants');
-      if (tenantsResponse.ok) {
-        const tenantsData = await tenantsResponse.json();
-        setTenants(tenantsData);
+      setError(null);
+
+      // Get auth token
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('No authentication token found');
       }
 
-      // Fetch pending partners
-      const pendingResponse = await fetch('/api/partners/pending');
-      if (pendingResponse.ok) {
-        const pendingData = await pendingResponse.json();
-        setPendingPartners(pendingData);
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Fetch all tenants
+      const tenantsResponse = await fetch('/api/white-label/tenants', { headers });
+      if (!tenantsResponse.ok) {
+        throw new Error(`Failed to fetch tenants: ${tenantsResponse.status}`);
       }
+      const tenantsData = await tenantsResponse.json();
+      setTenants(tenantsData);
+
+      // Fetch pending partners
+      const pendingResponse = await fetch('/api/partners/pending', { headers });
+      if (!pendingResponse.ok) {
+        throw new Error(`Failed to fetch pending partners: ${pendingResponse.status}`);
+      }
+      const pendingData = await pendingResponse.json();
+      setPendingPartners(pendingData);
 
       // Calculate stats
       calculatePlatformStats();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch admin data';
+      setError(errorMessage);
       console.error('Failed to fetch admin data:', error);
     } finally {
       setIsLoading(false);
@@ -78,54 +124,142 @@ export default function SuperAdminDashboard() {
   };
 
   const approvePartner = async (partnerId: string) => {
-    try {
-      const response = await fetch(`/api/partners/${partnerId}/approve`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        alert('Partner approved successfully!');
-        fetchAdminData(); // Refresh data
-      }
-    } catch (error) {
-      alert('Failed to approve partner');
+    if (!hasPermission('approve_partners')) {
+      setError('You do not have permission to approve partners');
+      return;
     }
+
+    const result = await executeWithRateLimit(
+      async () => {
+        setApprovingPartner(partnerId);
+        setError(null);
+
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`/api/partners/${partnerId}/approve`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to approve partner');
+        }
+
+        setSuccessMessage('Partner approved successfully!');
+        await logPartnerAction('approve', partnerId, { previousStatus: 'pending', newStatus: 'active' });
+        fetchAdminData(); // Refresh data
+
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccessMessage(null), 3000);
+        return true;
+      },
+      () => setError('Too many requests. Please wait before trying again.')
+    );
+
+    if (result === null) {
+      // Rate limited
+      return;
+    }
+
+    setApprovingPartner(null);
   };
 
   const suspendTenant = async (tenantId: string) => {
-    if (confirm('Are you sure you want to suspend this tenant?')) {
-      try {
+    if (!hasPermission('manage_tenants')) {
+      setError('You do not have permission to manage tenants');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to suspend this tenant?')) {
+      return;
+    }
+
+    const result = await executeWithRateLimit(
+      async () => {
+        setUpdatingTenant(tenantId);
+        setError(null);
+
+        const token = localStorage.getItem('authToken');
         const response = await fetch(`/api/white-label/tenants/${tenantId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({ status: 'suspended' }),
         });
 
-        if (response.ok) {
-          alert('Tenant suspended successfully!');
-          fetchAdminData();
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to suspend tenant');
         }
-      } catch (error) {
-        alert('Failed to suspend tenant');
-      }
+
+        setSuccessMessage('Tenant suspended successfully!');
+        await logTenantAction('suspend', tenantId, { previousStatus: 'active', newStatus: 'suspended' });
+        fetchAdminData();
+
+        setTimeout(() => setSuccessMessage(null), 3000);
+        return true;
+      },
+      () => setError('Too many requests. Please wait before trying again.')
+    );
+
+    if (result === null) {
+      // Rate limited
+      return;
     }
+
+    setUpdatingTenant(null);
   };
 
   const deleteTenant = async (tenantId: string) => {
-    if (confirm('Are you sure you want to delete this tenant? This action cannot be undone.')) {
-      try {
+    if (!hasPermission('delete_tenants')) {
+      setError('You do not have permission to delete tenants');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this tenant? This action cannot be undone.')) {
+      return;
+    }
+
+    const result = await executeWithRateLimit(
+      async () => {
+        setUpdatingTenant(tenantId);
+        setError(null);
+
+        const token = localStorage.getItem('authToken');
         const response = await fetch(`/api/white-label/tenants/${tenantId}`, {
           method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         });
 
-        if (response.ok) {
-          alert('Tenant deleted successfully!');
-          fetchAdminData();
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to delete tenant');
         }
-      } catch (error) {
-        alert('Failed to delete tenant');
-      }
+
+        setSuccessMessage('Tenant deleted successfully!');
+        await logTenantAction('delete', tenantId, { tenantName: selectedTenant?.name });
+        fetchAdminData();
+
+        setTimeout(() => setSuccessMessage(null), 3000);
+        return true;
+      },
+      () => setError('Too many requests. Please wait before trying again.')
+    );
+
+    if (result === null) {
+      // Rate limited
+      return;
     }
+
+    setUpdatingTenant(null);
   };
 
   // Sample growth data
@@ -138,12 +272,132 @@ export default function SuperAdminDashboard() {
     { month: 'Jun', partners: 35, customers: 315, revenue: 105000 },
   ];
 
+  // Input validation functions
+  const validateTenantForm = (data: Partial<Tenant>): Record<string, string> => {
+    const errors: Record<string, string> = {};
+
+    if (!data.name?.trim()) {
+      errors.name = 'Tenant name is required';
+    } else if (data.name.length < 2) {
+      errors.name = 'Tenant name must be at least 2 characters';
+    }
+
+    if (!data.subdomain?.trim()) {
+      errors.subdomain = 'Subdomain is required';
+    } else if (!/^[a-z0-9-]+$/.test(data.subdomain)) {
+      errors.subdomain = 'Subdomain can only contain lowercase letters, numbers, and hyphens';
+    }
+
+    if (data.monthlyRevenue !== undefined && data.monthlyRevenue < 0) {
+      errors.monthlyRevenue = 'Monthly revenue cannot be negative';
+    }
+
+    if (data.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contactEmail)) {
+      errors.contactEmail = 'Please enter a valid email address';
+    }
+
+    return errors;
+  };
+
+  const handleEditTenant = (tenant: Tenant) => {
+    setSelectedTenant(tenant);
+    setEditFormData({ ...tenant });
+    setFormErrors({});
+    setShowEditModal(true);
+  };
+
+  const handleFormChange = (field: string, value: any) => {
+    setEditFormData(prev => ({ ...prev, [field]: value }));
+    // Clear field error when user starts typing
+    if (formErrors[field]) {
+      setFormErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleSaveTenant = async () => {
+    if (!selectedTenant) return;
+
+    const errors = validateTenantForm(editFormData);
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    const result = await executeWithRateLimit(
+      async () => {
+        setUpdatingTenant(selectedTenant.id);
+        setError(null);
+
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`/api/white-label/tenants/${selectedTenant.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(editFormData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to update tenant');
+        }
+
+        setSuccessMessage('Tenant updated successfully!');
+        await logTenantAction('update', selectedTenant.id, {
+          changes: editFormData,
+          previousData: selectedTenant
+        });
+        setShowEditModal(false);
+        fetchAdminData();
+
+        setTimeout(() => setSuccessMessage(null), 3000);
+        return true;
+      },
+      () => setError('Too many requests. Please wait before trying again.')
+    );
+
+    if (result === null) {
+      // Rate limited
+      return;
+    }
+
+    setUpdatingTenant(null);
+  };
+
+  // Pagination logic
+  const totalPages = Math.ceil(tenants.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentTenants = tenants.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader2 className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-300">Loading super admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if not authenticated or not authorized
+  if (!isAuthenticated || !hasRole('super_admin')) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Access Denied
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            You don't have permission to access this dashboard.
+          </p>
         </div>
       </div>
     );
@@ -181,6 +435,25 @@ export default function SuperAdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Error/Success Messages */}
+        {error && (
+          <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-600 mr-2" />
+              <p className="text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-center">
+              <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+              <p className="text-green-800 dark:text-green-200">{successMessage}</p>
+            </div>
+          </div>
+        )}
+
         {/* Navigation Tabs */}
         <div className="border-b border-gray-200 dark:border-gray-700 mb-8">
           <nav className="-mb-px flex space-x-8">
@@ -334,118 +607,24 @@ export default function SuperAdminDashboard() {
         {/* All Tenants Tab */}
         {activeTab === 'tenants' && (
           <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  All Tenants Management
-                </h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Tenant
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Plan
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Users
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Revenue
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {tenants.map((tenant) => (
-                      <tr key={tenant.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {tenant.name}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {tenant.subdomain}.smartcrm.com
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            tenant.type === 'partner' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                          }`}>
-                            {tenant.type}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            tenant.plan === 'enterprise' ? 'bg-purple-100 text-purple-800' :
-                            tenant.plan === 'pro' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {tenant.plan}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            tenant.status === 'active' ? 'bg-green-100 text-green-800' :
-                            tenant.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {tenant.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          {tenant.userCount}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                          ${tenant.monthlyRevenue}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex gap-2">
-                            <button className="text-blue-600 hover:text-blue-900 flex items-center gap-1">
-                              <Eye className="h-4 w-4" />
-                              View
-                            </button>
-                            <button 
-                              onClick={() => {setSelectedTenant(tenant); setShowEditModal(true);}}
-                              className="text-gray-600 hover:text-gray-900 flex items-center gap-1"
-                            >
-                              <Edit className="h-4 w-4" />
-                              Edit
-                            </button>
-                            <button 
-                              onClick={() => suspendTenant(tenant.id)}
-                              className="text-yellow-600 hover:text-yellow-900 flex items-center gap-1"
-                            >
-                              <XCircle className="h-4 w-4" />
-                              Suspend
-                            </button>
-                            <button 
-                              onClick={() => deleteTenant(tenant.id)}
-                              className="text-red-600 hover:text-red-900 flex items-center gap-1"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <TenantTable
+              tenants={currentTenants}
+              updatingTenant={updatingTenant}
+              onView={(tenant) => {/* TODO: Implement view functionality */}}
+              onEdit={handleEditTenant}
+              onSuspend={suspendTenant}
+              onDelete={deleteTenant}
+            />
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={tenants.length}
+              itemsPerPage={itemsPerPage}
+              startIndex={startIndex}
+              endIndex={endIndex}
+              onPageChange={handlePageChange}
+            />
           </div>
         )}
 
@@ -497,11 +676,16 @@ export default function SuperAdminDashboard() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex gap-2">
-                              <button 
+                              <button
                                 onClick={() => approvePartner(partner.id)}
-                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded flex items-center gap-1"
+                                disabled={approvingPartner === partner.id}
+                                className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white px-3 py-1 rounded flex items-center gap-1"
                               >
-                                <CheckCircle className="h-4 w-4" />
+                                {approvingPartner === partner.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <CheckCircle className="h-4 w-4" />
+                                )}
                                 Approve
                               </button>
                               <button className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded flex items-center gap-1">
@@ -666,68 +850,115 @@ export default function SuperAdminDashboard() {
               Edit Tenant: {selectedTenant.name}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Tenant Name
-                </label>
-                <input
-                  type="text"
-                  defaultValue={selectedTenant.name}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Plan
-                </label>
-                <select 
-                  defaultValue={selectedTenant.plan}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="basic">Basic</option>
-                  <option value="pro">Pro</option>
-                  <option value="enterprise">Enterprise</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Status
-                </label>
-                <select 
-                  defaultValue={selectedTenant.status}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="active">Active</option>
-                  <option value="suspended">Suspended</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Monthly Revenue
-                </label>
-                <input
-                  type="number"
-                  defaultValue={selectedTenant.monthlyRevenue}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                   Tenant Name
+                 </label>
+                 <input
+                   type="text"
+                   value={editFormData.name || ''}
+                   onChange={(e) => handleFormChange('name', e.target.value)}
+                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                     formErrors.name ? 'border-red-500' : 'border-gray-300'
+                   }`}
+                 />
+                 {formErrors.name && (
+                   <p className="mt-1 text-sm text-red-600">{formErrors.name}</p>
+                 )}
+               </div>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                   Subdomain
+                 </label>
+                 <input
+                   type="text"
+                   value={editFormData.subdomain || ''}
+                   onChange={(e) => handleFormChange('subdomain', e.target.value)}
+                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                     formErrors.subdomain ? 'border-red-500' : 'border-gray-300'
+                   }`}
+                 />
+                 {formErrors.subdomain && (
+                   <p className="mt-1 text-sm text-red-600">{formErrors.subdomain}</p>
+                 )}
+               </div>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                   Plan
+                 </label>
+                 <select
+                   value={editFormData.plan || 'basic'}
+                   onChange={(e) => handleFormChange('plan', e.target.value)}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 >
+                   <option value="basic">Basic</option>
+                   <option value="pro">Pro</option>
+                   <option value="enterprise">Enterprise</option>
+                 </select>
+               </div>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                   Status
+                 </label>
+                 <select
+                   value={editFormData.status || 'active'}
+                   onChange={(e) => handleFormChange('status', e.target.value)}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 >
+                   <option value="active">Active</option>
+                   <option value="suspended">Suspended</option>
+                   <option value="pending">Pending</option>
+                 </select>
+               </div>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                   Monthly Revenue
+                 </label>
+                 <input
+                   type="number"
+                   value={editFormData.monthlyRevenue || 0}
+                   onChange={(e) => handleFormChange('monthlyRevenue', parseFloat(e.target.value) || 0)}
+                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                     formErrors.monthlyRevenue ? 'border-red-500' : 'border-gray-300'
+                   }`}
+                   min="0"
+                   step="0.01"
+                 />
+                 {formErrors.monthlyRevenue && (
+                   <p className="mt-1 text-sm text-red-600">{formErrors.monthlyRevenue}</p>
+                 )}
+               </div>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                   Contact Email
+                 </label>
+                 <input
+                   type="email"
+                   value={editFormData.contactEmail || ''}
+                   onChange={(e) => handleFormChange('contactEmail', e.target.value)}
+                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                     formErrors.contactEmail ? 'border-red-500' : 'border-gray-300'
+                   }`}
+                 />
+                 {formErrors.contactEmail && (
+                   <p className="mt-1 text-sm text-red-600">{formErrors.contactEmail}</p>
+                 )}
+               </div>
+             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowEditModal(false)}
                 className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                disabled={updatingTenant !== null}
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  // Save logic here
-                  setShowEditModal(false);
-                  alert('Tenant updated successfully!');
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                onClick={handleSaveTenant}
+                disabled={updatingTenant !== null}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 flex items-center gap-2"
               >
+                {updatingTenant !== null && <Loader2 className="h-4 w-4 animate-spin" />}
                 Save Changes
               </button>
             </div>

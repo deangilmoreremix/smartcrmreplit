@@ -10,6 +10,7 @@ import { VideoCallProvider } from './contexts/VideoCallContext';
 import { NavigationProvider } from './contexts/NavigationContext';
 import { DashboardLayoutProvider } from './contexts/DashboardLayoutContext';
 import { AIProvider } from './contexts/AIContext';
+import { AuthProvider } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
@@ -27,6 +28,8 @@ const AITools = lazy(() => import('./pages/AITools'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const AIIntegration = lazy(() => import('./pages/AIIntegration'));
 const MobileResponsiveness = lazy(() => import('./pages/MobileResponsiveness'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard'));
 
 import './components/styles/design-system.css';
 
@@ -47,14 +50,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => <>{child
 
 function App() {
   return (
-    <ThemeProvider>
-      <AIToolsProvider>
-        <ModalsProvider>
-          <EnhancedHelpProvider>
-            <VideoCallProvider>
-              <NavigationProvider>
-                <DashboardLayoutProvider>
-                  <AIProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <AIToolsProvider>
+          <ModalsProvider>
+            <EnhancedHelpProvider>
+              <VideoCallProvider>
+                <NavigationProvider>
+                  <DashboardLayoutProvider>
+                    <AIProvider>
                     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
                       <Navbar />
                       <Suspense fallback={<LoadingSpinner message="Loading page..." size="lg" />}>
@@ -315,6 +319,24 @@ function App() {
                             element={<PlaceholderPage title="White-Label Customization" />}
                           />
 
+                          {/* Admin Routes */}
+                          <Route
+                            path="/super-admin"
+                            element={
+                              <ProtectedRoute>
+                                <SuperAdminDashboard />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/user-management"
+                            element={
+                              <ProtectedRoute>
+                                <UserManagement />
+                              </ProtectedRoute>
+                            }
+                          />
+
                           {/* Misc / Settings */}
                           <Route
                             path="/settings"
@@ -335,14 +357,15 @@ function App() {
                         </Routes>
                       </Suspense>
                     </div>
-                  </AIProvider>
-                </DashboardLayoutProvider>
-              </NavigationProvider>
-            </VideoCallProvider>
-          </EnhancedHelpProvider>
-        </ModalsProvider>
-      </AIToolsProvider>
-    </ThemeProvider>
+                    </AIProvider>
+                  </DashboardLayoutProvider>
+                </NavigationProvider>
+              </VideoCallProvider>
+            </EnhancedHelpProvider>
+          </ModalsProvider>
+        </AIToolsProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 
