@@ -7,6 +7,7 @@ import { useAppointmentStore } from '../store/appointmentStore';
 import { useAITools } from './AIToolsProvider';
 import { useTheme } from '../contexts/ThemeContext';
 import { useDashboardLayout } from '../contexts/DashboardLayoutContext';
+import { useFeatures } from '../contexts/FeatureContext';
 import DraggableSection from './DraggableSection';
 import DashboardLayoutControls from './DashboardLayoutControls';
 
@@ -39,25 +40,23 @@ import VideoCallOverlay from './VideoCallOverlay';
 
 // Memo Dashboard component to prevent unnecessary re-renders
 const Dashboard: React.FC = React.memo(() => {
-  const { 
-    deals, 
-    fetchDeals, 
-    isLoading,
-    stageValues,
-    totalPipelineValue 
+  const {
+    deals,
+    fetchDeals,
+    isLoading
   } = useDealStore();
-  
-  const { 
-    contacts, 
-    fetchContacts, 
-    isLoading: contactsLoading 
+
+  const {
+    contacts,
+    fetchContacts,
+    isLoading: contactsLoading
   } = useContactStore();
-  
-  const { tasks, fetchTasks } = useTaskStore();
+
   const { appointments, fetchAppointments } = useAppointmentStore();
   const { openTool } = useAITools();
   const { isDark } = useTheme();
   const { sectionOrder } = useDashboardLayout();
+  const { hasFeature } = useFeatures();
   
   const gemini = useGemini();
   
@@ -98,19 +97,19 @@ const Dashboard: React.FC = React.memo(() => {
         return typeof ExecutiveOverviewSection === 'function' ? <ExecutiveOverviewSection /> : null;
 
       case 'ai-smart-features-hub':
-        return typeof AISmartFeaturesHub === 'function' ? <AISmartFeaturesHub /> : null;
+        return hasFeature('aiTools') && typeof AISmartFeaturesHub === 'function' ? <AISmartFeaturesHub /> : null;
 
       case 'sales-pipeline-deal-analytics':
-        return typeof SalesPipelineDealAnalytics === 'function' ? <SalesPipelineDealAnalytics /> : null;
+        return hasFeature('pipeline') && typeof SalesPipelineDealAnalytics === 'function' ? <SalesPipelineDealAnalytics /> : null;
 
       case 'customer-lead-management':
-        return typeof CustomerLeadManagement === 'function' ? <CustomerLeadManagement /> : null;
+        return hasFeature('contacts') && typeof CustomerLeadManagement === 'function' ? <CustomerLeadManagement /> : null;
 
       case 'activities-communications':
-        return typeof ActivitiesCommunications === 'function' ? <ActivitiesCommunications /> : null;
+        return hasFeature('communication') && typeof ActivitiesCommunications === 'function' ? <ActivitiesCommunications /> : null;
 
       case 'integrations-system':
-        return typeof IntegrationsSystem === 'function' ? <IntegrationsSystem /> : null;
+        return hasFeature('customIntegrations') && typeof IntegrationsSystem === 'function' ? <IntegrationsSystem /> : null;
 
       // Legacy sections (kept for backward compatibility)
       case 'metrics-cards-section':
@@ -121,9 +120,9 @@ const Dashboard: React.FC = React.memo(() => {
 
       case 'quick-actions-section':
         return <QuickActions />;
-        
+
       case 'ai-insights-section':
-        return <AIInsightsPanel />;
+        return hasFeature('aiTools') && <AIInsightsPanel />;
 
       case 'interaction-history-section':
         return <InteractionHistory />;
@@ -135,16 +134,16 @@ const Dashboard: React.FC = React.memo(() => {
         return <RecentActivity />;
 
       case 'tasks-and-funnel-section':
-        return <TasksAndFunnel />;
+        return hasFeature('tasks') && <TasksAndFunnel />;
 
       case 'charts-section':
-        return <ChartsSection />;
+        return hasFeature('analytics') && <ChartsSection />;
 
       case 'analytics-section':
-        return <ChartsSection />;
+        return hasFeature('analytics') && <ChartsSection />;
 
       case 'apps-section':
-        return <ConnectedApps />;
+        return hasFeature('customIntegrations') && <ConnectedApps />;
 
       default:
         return null;

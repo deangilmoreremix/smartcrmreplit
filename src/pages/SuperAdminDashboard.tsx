@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuditLogger } from '../hooks/useAuditLogger';
 import { useRateLimiter } from '../hooks/useRateLimiter';
+import { useFeatures } from '../contexts/FeatureContext';
 import { TenantTable } from '../components/admin/TenantTable';
 import { Pagination } from '../components/admin/Pagination';
 
@@ -36,6 +37,7 @@ export default function SuperAdminDashboard() {
   const navigate = useNavigate();
   const { logTenantAction, logPartnerAction } = useAuditLogger();
   const { executeWithRateLimit } = useRateLimiter({ maxRequests: 10, windowMs: 60000 }); // 10 actions per minute
+  const { updateGlobalFeature, globalFeatures } = useFeatures();
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [pendingPartners, setPendingPartners] = useState<Tenant[]>([]);
@@ -810,30 +812,36 @@ export default function SuperAdminDashboard() {
               </h3>
               <div className="space-y-4">
                 {[
-                  { name: 'AI Tools', key: 'aiTools', enabled: true },
-                  { name: 'Advanced Analytics', key: 'advancedAnalytics', enabled: true },
-                  { name: 'Custom Integrations', key: 'customIntegrations', enabled: false },
-                  { name: 'White-label Branding', key: 'whitelabelBranding', enabled: true },
-                  { name: 'API Access', key: 'apiAccess', enabled: false },
+                  { name: 'AI Tools', key: 'aiTools', description: 'AI-powered features and assistants' },
+                  { name: 'Advanced Analytics', key: 'advancedAnalytics', description: 'Detailed reporting and insights' },
+                  { name: 'Custom Integrations', key: 'customIntegrations', description: 'Third-party API integrations' },
+                  { name: 'White-label Branding', key: 'whitelabelBranding', description: 'Custom branding options' },
+                  { name: 'API Access', key: 'apiAccess', description: 'Direct API access for integrations' },
                 ].map((feature) => (
                   <div key={feature.key} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white">{feature.name}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Available to all tenants
+                        {feature.description}
                       </p>
                     </div>
-                    <button
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        feature.enabled ? 'bg-blue-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          feature.enabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={globalFeatures[feature.key as keyof typeof globalFeatures] || false}
+                        onChange={async (e) => {
+                          try {
+                            await updateGlobalFeature(feature.key as any, e.target.checked);
+                            setSuccessMessage(`Global feature "${feature.name}" ${e.target.checked ? 'enabled' : 'disabled'} successfully!`);
+                            setTimeout(() => setSuccessMessage(null), 3000);
+                          } catch (error) {
+                            setError(`Failed to update ${feature.name} feature`);
+                          }
+                        }}
+                        className="sr-only peer"
                       />
-                    </button>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                    </label>
                   </div>
                 ))}
               </div>

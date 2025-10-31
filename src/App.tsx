@@ -11,6 +11,8 @@ import { NavigationProvider } from './contexts/NavigationContext';
 import { DashboardLayoutProvider } from './contexts/DashboardLayoutContext';
 import { AIProvider } from './contexts/AIContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { FeatureProvider } from './contexts/FeatureContext';
+import { FeatureGate } from './components/FeatureGate';
 import Navbar from './components/Navbar';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
@@ -51,7 +53,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => <>{child
 function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
+      <FeatureProvider>
+        <ThemeProvider>
         <AIToolsProvider>
           <ModalsProvider>
             <EnhancedHelpProvider>
@@ -87,7 +90,9 @@ function App() {
                             path="/analytics"
                             element={
                               <ProtectedRoute>
-                                <Analytics />
+                                <FeatureGate feature="analytics">
+                                  <Analytics />
+                                </FeatureGate>
                               </ProtectedRoute>
                             }
                           />
@@ -103,7 +108,9 @@ function App() {
                             path="/ai-tools"
                             element={
                               <ProtectedRoute>
-                                <AITools />
+                                <FeatureGate feature="aiTools">
+                                  <AITools />
+                                </FeatureGate>
                               </ProtectedRoute>
                             }
                           />
@@ -111,7 +118,9 @@ function App() {
                             path="/pipeline"
                             element={
                               <ProtectedRoute>
-                                <Pipeline />
+                                <FeatureGate feature="pipeline">
+                                  <Pipeline />
+                                </FeatureGate>
                               </ProtectedRoute>
                             }
                           />
@@ -187,11 +196,19 @@ function App() {
                           {/* Appointments already routed to /appointments above */}
                           <Route
                             path="/phone-system"
-                            element={<PlaceholderPage title="Phone System" />}
+                            element={
+                              <FeatureGate feature="phoneSystem">
+                                <PlaceholderPage title="Phone System" />
+                              </FeatureGate>
+                            }
                           />
                           <Route
                             path="/invoicing"
-                            element={<PlaceholderPage title="Invoicing" />}
+                            element={
+                              <FeatureGate feature="invoicing">
+                                <PlaceholderPage title="Invoicing" />
+                              </FeatureGate>
+                            }
                           />
                           <Route
                             path="/sales-analytics"
@@ -239,7 +256,11 @@ function App() {
                           {/* ===== Dropdown: Communication ===== */}
                           <Route
                             path="/video-email"
-                            element={<PlaceholderPage title="Video Email" />}
+                            element={
+                              <FeatureGate feature="videoEmail">
+                                <PlaceholderPage title="Video Email" />
+                              </FeatureGate>
+                            }
                           />
                           <Route
                             path="/text-messages"
@@ -365,6 +386,7 @@ function App() {
           </ModalsProvider>
         </AIToolsProvider>
       </ThemeProvider>
+      </FeatureProvider>
     </AuthProvider>
   );
 }

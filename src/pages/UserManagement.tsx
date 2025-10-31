@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuditLogger } from '../hooks/useAuditLogger';
 import { useRateLimiter } from '../hooks/useRateLimiter';
+import { useFeatures } from '../contexts/FeatureContext';
 import { Pagination } from '../components/admin/Pagination';
 
 interface User {
@@ -36,6 +37,7 @@ export default function UserManagement() {
   const navigate = useNavigate();
   const { logAction } = useAuditLogger();
   const { executeWithRateLimit } = useRateLimiter({ maxRequests: 20, windowMs: 60000 }); // 20 actions per minute for user management
+  const { updateUserFeature, hasUserFeature } = useFeatures();
 
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,6 +60,8 @@ export default function UserManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [showMigrationPanel, setShowMigrationPanel] = useState(false);
+  const [showFeatureModal, setShowFeatureModal] = useState(false);
+  const [selectedUserForFeatures, setSelectedUserForFeatures] = useState<User | null>(null);
 
   useEffect(() => {
     // Check authentication and permissions
@@ -344,6 +348,29 @@ export default function UserManagement() {
     setCurrentPage(page);
   };
 
+  const handleManageFeatures = (user: User) => {
+    setSelectedUserForFeatures(user);
+    setShowFeatureModal(true);
+  };
+
+  const handleFeatureToggle = async (feature: string, enabled: boolean) => {
+    if (!selectedUserForFeatures) return;
+
+    try {
+      await updateUserFeature(selectedUserForFeatures.id, feature as any, enabled);
+      await logAction({
+        action: 'update_user_feature',
+        resource: 'user',
+        resourceId: selectedUserForFeatures.id,
+        details: { feature, enabled, previousState: hasUserFeature(feature as any) }
+      });
+      setSuccessMessage('User feature updated successfully!');
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (error) {
+      setError('Failed to update user feature');
+    }
+  };
+
   const availableRoles = [
     { value: 'regular_user', label: 'Regular User', description: 'Core CRM features only' },
     { value: 'wl_user', label: 'WL User', description: 'Full CRM + AI tools' },
@@ -549,6 +576,17 @@ export default function UserManagement() {
                             {updatingUser === user.id && <Loader2 className="h-4 w-4 animate-spin" />}
                             <Edit className="h-4 w-4" />
                             Edit
+                          </button>
+                        )}
+
+                        {hasPermission('users.edit') && (
+                          <button
+                            onClick={() => handleManageFeatures(user)}
+                            disabled={updatingUser === user.id}
+                            className="text-purple-600 hover:text-purple-900 disabled:text-purple-400 flex items-center gap-1"
+                          >
+                            <Settings className="h-4 w-4" />
+                            Features
                           </button>
                         )}
 
@@ -800,6 +838,67 @@ export default function UserManagement() {
                 onClick={() => setEditingUser(null)}
                 disabled={updatingUser === editingUser.id}
                 className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feature Management Modal */}
+      {showFeatureModal && selectedUserForFeatures && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Manage Features: {selectedUserForFeatures.email}
+            </h3>
+
+            <div className="space-y-4">
+              {[
+                { key: 'aiTools', label: 'AI Tools', description: 'Access to AI-powered features and assistants' },
+                { key: 'advancedAnalytics', label: 'Advanced Analytics', description: 'Detailed reporting and insights' },
+                { key: 'customIntegrations', label: 'Custom Integrations', description: 'Third-party API integrations' },
+                { key: 'whitelabelBranding', label: 'White-label Branding', description: 'Custom branding options' },
+                { key: 'apiAccess', label: 'API Access', description: 'Direct API access for integrations' },
+                { key: 'smartcrm', label: 'SmartCRM Core', description: 'Basic CRM functionality' },
+                { key: 'salesMaximizer', label: 'Sales Maximizer', description: 'Advanced sales tools and automation' },
+                { key: 'aiBoost', label: 'AI Boost Unlimited', description: 'Unlimited AI usage' },
+                { key: 'communicationSuite', label: 'Communication Suite', description: 'Advanced communication tools' },
+                { key: 'businessIntelligence', label: 'Business Intelligence', description: 'Advanced BI and reporting' },
+                { key: 'videoEmail', label: 'Video Email', description: 'Video email functionality' },
+                { key: 'phoneSystem', label: 'Phone System', description: 'Integrated phone system' },
+                { key: 'pipeline', label: 'Pipeline Management', description: 'Deal pipeline management' },
+                { key: 'contacts', label: 'Contact Management', description: 'Advanced contact features' },
+                { key: 'tasks', label: 'Task Management', description: 'Task and project management' },
+                { key: 'appointments', label: 'Appointments', description: 'Calendar and scheduling' },
+                { key: 'invoicing', label: 'Invoicing', description: 'Invoice creation and management' },
+                { key: 'analytics', label: 'Analytics', description: 'Basic analytics and reporting' },
+                { key: 'communication', label: 'Communication', description: 'Email and messaging tools' },
+                { key: 'formsSurveys', label: 'Forms & Surveys', description: 'Form creation and survey tools' },
+              ].map((feature) => (
+                <div key={feature.key} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 dark:text-white">{feature.label}</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{feature.description}</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasUserFeature(feature.key as any)}
+                      onChange={(e) => handleFeatureToggle(feature.key, e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowFeatureModal(false)}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Close
               </button>
