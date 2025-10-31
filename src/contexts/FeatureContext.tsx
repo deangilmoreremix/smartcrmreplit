@@ -1,48 +1,18 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { featureService } from '../services/featureService';
+import {
+  FeatureKey,
+  FeatureContextType,
+  UserFeatures,
+  GlobalFeatures,
+  FEATURE_DEFINITIONS,
+  getFeatureDependencies,
+  getFeatureConflicts
+} from '../types/feature';
 
-export type FeatureKey =
-  | 'aiTools'
-  | 'advancedAnalytics'
-  | 'customIntegrations'
-  | 'whitelabelBranding'
-  | 'apiAccess'
-  | 'smartcrm'
-  | 'salesMaximizer'
-  | 'aiBoost'
-  | 'communicationSuite'
-  | 'businessIntelligence'
-  | 'videoEmail'
-  | 'phoneSystem'
-  | 'pipeline'
-  | 'contacts'
-  | 'tasks'
-  | 'appointments'
-  | 'invoicing'
-  | 'analytics'
-  | 'communication'
-  | 'formsSurveys'
-  | 'leadAutomation';
-
-interface UserFeatures {
-  [key: string]: boolean;
-}
-
-interface GlobalFeatures {
-  [key: string]: boolean;
-}
-
-interface FeatureContextType {
-  userFeatures: UserFeatures;
-  globalFeatures: GlobalFeatures;
-  isLoading: boolean;
-  hasFeature: (feature: FeatureKey) => boolean;
-  hasUserFeature: (feature: FeatureKey) => boolean;
-  hasGlobalFeature: (feature: FeatureKey) => boolean;
-  updateUserFeature: (userId: string, feature: FeatureKey, enabled: boolean) => Promise<void>;
-  updateGlobalFeature: (feature: FeatureKey, enabled: boolean) => Promise<void>;
-  refreshFeatures: () => Promise<void>;
-}
+// Re-export types from the centralized types file
+export type { FeatureKey, FeatureContextType, UserFeatures, GlobalFeatures } from '../types/feature';
 
 const FeatureContext = createContext<FeatureContextType | undefined>(undefined);
 
@@ -75,19 +45,8 @@ export const FeatureProvider: React.FC<FeatureProviderProps> = ({ children }) =>
     if (!user?.id) return;
 
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token) return;
-
-      const response = await fetch(`/api/users/${user.id}/features`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const features = await response.json();
-        setUserFeatures(features);
-      }
+      const features = await featureService.getUserFeatures(user.id);
+      setUserFeatures(features);
     } catch (error) {
       console.error('Failed to load user features:', error);
     }
@@ -96,19 +55,8 @@ export const FeatureProvider: React.FC<FeatureProviderProps> = ({ children }) =>
   // Load global features
   const loadGlobalFeatures = useCallback(async () => {
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token) return;
-
-      const response = await fetch('/api/features/global', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const features = await response.json();
-        setGlobalFeatures(prev => ({ ...prev, ...features }));
-      }
+      const features = await featureService.getGlobalFeatures();
+      setGlobalFeatures(prev => ({ ...prev, ...features }));
     } catch (error) {
       console.error('Failed to load global features:', error);
     }
@@ -150,62 +98,35 @@ export const FeatureProvider: React.FC<FeatureProviderProps> = ({ children }) =>
 
   // Update user feature
   const updateUserFeature = useCallback(async (userId: string, feature: FeatureKey, enabled: boolean) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) throw new Error('No auth token');
-
-      const response = await fetch(`/api/users/${userId}/features/${feature}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ enabled }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update user feature');
-      }
-
-      // Update local state
-      setUserFeatures(prev => ({
-        ...prev,
-        [feature]: enabled,
-      }));
-    } catch (error) {
-      console.error('Failed to update user feature:', error);
-      throw error;
+    const result = await featureService.updateUserFeature(userId, feature, enabled);
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to update user feature');
     }
+
+    // Update local state
+    setUserFeatures(prev => ({
+      ...prev,
+      [feature]: enabled,
+    }));
   }, []);
 
   // Update global feature
   const updateGlobalFeature = useCallback(async (feature: FeatureKey, enabled: boolean) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) throw new Error('No auth token');
-
-      const response = await fetch(`/api/features/global/${feature}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ enabled }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update global feature');
-      }
-
-      // Update local state
-      setGlobalFeatures(prev => ({
-        ...prev,
-        [feature]: enabled,
-      }));
-    } catch (error) {
-      console.error('Failed to update global feature:', error);
-      throw error;
+    const result = await featureService.updateGlobalFeature(feature, enabled);
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to update global feature');
     }
+
+    // Update local state
+    setGlobalFeatures(prev => ({
+      ...prev,
+      [feature]: enabled,
+    }));
+  }, []);
+
+  // Validate feature combination
+  const validateFeatureCombination = useCallback((features: Record<FeatureKey, boolean>) => {
+    return featureService.validateFeatureCombination(features);
   }, []);
 
   const value: FeatureContextType = {
@@ -218,6 +139,7 @@ export const FeatureProvider: React.FC<FeatureProviderProps> = ({ children }) =>
     updateUserFeature,
     updateGlobalFeature,
     refreshFeatures,
+    validateFeatureCombination,
   };
 
   return (

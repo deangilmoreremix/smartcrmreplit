@@ -35,7 +35,7 @@ interface InviteUserData {
 export default function UserManagement() {
   const { user, isAuthenticated, hasRole, hasPermission } = useAuth();
   const navigate = useNavigate();
-  const { logAction } = useAuditLogger();
+  const { logAction, logUserFeatureAction } = useAuditLogger();
   const { executeWithRateLimit } = useRateLimiter({ maxRequests: 20, windowMs: 60000 }); // 20 actions per minute for user management
   const { updateUserFeature, hasUserFeature } = useFeatures();
 
@@ -358,11 +358,9 @@ export default function UserManagement() {
 
     try {
       await updateUserFeature(selectedUserForFeatures.id, feature as any, enabled);
-      await logAction({
-        action: 'update_user_feature',
-        resource: 'user',
-        resourceId: selectedUserForFeatures.id,
-        details: { feature, enabled, previousState: hasUserFeature(feature as any) }
+      await logUserFeatureAction('update', selectedUserForFeatures.id, feature, {
+        enabled,
+        previousState: hasUserFeature(feature as any)
       });
       setSuccessMessage('User feature updated successfully!');
       setTimeout(() => setSuccessMessage(null), 3000);

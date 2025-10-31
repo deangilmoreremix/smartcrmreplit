@@ -59,10 +59,30 @@ export const useAuditLogger = () => {
     });
   }, [logAction]);
 
+  const logFeatureAction = useCallback((action: string, featureName: string, details?: Record<string, any>) => {
+    logAction({
+      action,
+      resource: 'feature',
+      resourceId: featureName,
+      details,
+    });
+  }, [logAction]);
+
+  const logUserFeatureAction = useCallback((action: string, userId: string, featureName: string, details?: Record<string, any>) => {
+    logAction({
+      action,
+      resource: 'user_feature',
+      resourceId: `${userId}:${featureName}`,
+      details,
+    });
+  }, [logAction]);
+
   return {
     logAction,
     logTenantAction,
     logPartnerAction,
     logSystemAction,
+    logFeatureAction,
+    logUserFeatureAction,
   };
 };

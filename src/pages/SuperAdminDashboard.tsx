@@ -35,7 +35,7 @@ interface PlatformStats {
 export default function SuperAdminDashboard() {
   const { user, isAuthenticated, hasRole, hasPermission } = useAuth();
   const navigate = useNavigate();
-  const { logTenantAction, logPartnerAction } = useAuditLogger();
+  const { logTenantAction, logPartnerAction, logFeatureAction } = useAuditLogger();
   const { executeWithRateLimit } = useRateLimiter({ maxRequests: 10, windowMs: 60000 }); // 10 actions per minute
   const { updateGlobalFeature, globalFeatures } = useFeatures();
   const [stats, setStats] = useState<PlatformStats | null>(null);
@@ -832,6 +832,10 @@ export default function SuperAdminDashboard() {
                         onChange={async (e) => {
                           try {
                             await updateGlobalFeature(feature.key as any, e.target.checked);
+                            await logFeatureAction('update_global', feature.key, {
+                              enabled: e.target.checked,
+                              featureName: feature.name
+                            });
                             setSuccessMessage(`Global feature "${feature.name}" ${e.target.checked ? 'enabled' : 'disabled'} successfully!`);
                             setTimeout(() => setSuccessMessage(null), 3000);
                           } catch (error) {
