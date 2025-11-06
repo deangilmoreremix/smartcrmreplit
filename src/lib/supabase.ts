@@ -2,16 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 
 // Get environment variables with fallbacks
 const getSupabaseUrl = () => {
-  if (typeof window !== 'undefined' && window.ENV_VARS?.SUPABASE_URL) {
-    return window.ENV_VARS.SUPABASE_URL;
-  }
   return import.meta.env.VITE_SUPABASE_URL || '';
 };
 
 const getSupabaseAnonKey = () => {
-  if (typeof window !== 'undefined' && window.ENV_VARS?.SUPABASE_ANON_KEY) {
-    return window.ENV_VARS.SUPABASE_ANON_KEY;
-  }
   return import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 };
 
@@ -67,4 +61,30 @@ export const isSupabaseConfigured = () => {
 // Log configuration status for debugging
 if (!isConfigured) {
   console.warn('Supabase is not properly configured. Some features may not work.');
+}
+
+// Validate configuration on app startup
+export const validateConfiguration = () => {
+  const issues: string[] = [];
+
+  if (!isValidUrl(supabaseUrl)) {
+    issues.push('VITE_SUPABASE_URL is not configured or invalid');
+  }
+
+  if (!isValidKey(supabaseAnonKey)) {
+    issues.push('VITE_SUPABASE_ANON_KEY is not configured or invalid');
+  }
+
+  if (issues.length > 0) {
+    console.error('Configuration validation failed:', issues);
+    return false;
+  }
+
+  console.log('Supabase configuration validated successfully');
+  return true;
+};
+
+// Initialize configuration validation
+if (typeof window !== 'undefined') {
+  validateConfiguration();
 }

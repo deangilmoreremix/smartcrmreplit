@@ -62,32 +62,32 @@ const Dashboard: React.FC = React.memo(() => {
   
   // Prevent repeated data fetching by using a ref to track initialization
   const initializedRef = useRef(false);
-  
+
   useEffect(() => {
     // Only fetch data once
     if (initializedRef.current) return;
     initializedRef.current = true;
-    
+
     // Fetch all data when component mounts
     fetchDeals();
     fetchContacts();
-    
+
     // Wrap in try/catch to prevent errors from breaking the app
     try {
       fetchAppointments();
     } catch (error) {
       console.error("Error fetching appointments:", error);
     }
-    
+
     // Set up timer to refresh data periodically
-    const intervalId = window.setInterval(() => {
+    const intervalId = setInterval(() => {
       fetchDeals();
       fetchContacts();
     }, 300000); // Refresh every 5 minutes
 
     // Proper cleanup
-    return () => window.clearInterval(intervalId);
-  }, []);
+    return () => clearInterval(intervalId);
+  }, [fetchDeals, fetchContacts, fetchAppointments]);
   
   // Render section content based on section ID
   const renderSectionContent = (sectionId: string) => {

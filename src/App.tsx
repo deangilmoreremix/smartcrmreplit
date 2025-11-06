@@ -10,7 +10,7 @@ import { VideoCallProvider } from './contexts/VideoCallContext';
 import { NavigationProvider } from './contexts/NavigationContext';
 import { DashboardLayoutProvider } from './contexts/DashboardLayoutContext';
 import { AIProvider } from './contexts/AIContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FeatureProvider } from './contexts/FeatureContext';
 import { SidebarProvider } from './contexts/SidebarContext';
 import { FeatureGate } from './components/FeatureGate';
@@ -48,8 +48,22 @@ const PlaceholderPage = ({ title, description }: { title: string; description?: 
   </div>
 );
 
-// Simple protected wrapper if/when you add auth
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+// Protected route component using real auth
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+    </div>;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 function App() {
   return (
@@ -70,6 +84,9 @@ function App() {
                       <Suspense fallback={<LoadingSpinner message="Loading page..." size="lg" />}>
                           <main className="flex-1 overflow-auto">
                             <Routes>
+                              {/* Auth routes */}
+                              <Route path="/auth" element={<div>Auth Page Coming Soon</div>} />
+
                               {/* Redirect root to dashboard */}
                               <Route path="/" element={<Navigate to="/dashboard" replace />} />
 

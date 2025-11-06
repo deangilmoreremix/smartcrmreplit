@@ -7,6 +7,7 @@ import { logger } from './logger.service';
 import { cacheService } from './cache.service';
 import { rateLimiter } from './rate-limiter.service';
 import { httpClient } from './http-client.service';
+import { supabase } from '../lib/supabase';
 import { Contact } from '../types/contact';
 
 export interface AIRequest {
@@ -255,24 +256,17 @@ class AIOrchestrator {
   }
 
   private async callProvider(provider: AIProvider, request: AIRequest): Promise<any> {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase configuration missing');
-    }
-
     // Map request types to edge function endpoints
     const endpointMap: Record<string, string> = {
-      'contact_scoring': 'smart-score',
-      'contact_enrichment': 'smart-enrichment',
-      'email_generation': 'email-composer',
-      'email_analysis': 'email-analyzer',
-      'insights_generation': 'ai-insights',
-      'communication_analysis': 'communication-logs',
-      'automation_suggestions': 'smart-categorize',
-      'predictive_analytics': 'smart-qualify',
-      'relationship_mapping': 'smart-enrichment'
+      'contact_scoring': 'analyze-sentiment',
+      'contact_enrichment': 'natural-language-query',
+      'email_generation': 'draft-email-response',
+      'email_analysis': 'analyze-sentiment',
+      'insights_generation': 'prioritize-tasks',
+      'communication_analysis': 'summarize-customer-notes',
+      'automation_suggestions': 'generate-sales-pitch',
+      'predictive_analytics': 'natural-language-query',
+      'relationship_mapping': 'natural-language-query'
     };
 
     const endpoint = endpointMap[request.type];
@@ -280,20 +274,19 @@ class AIOrchestrator {
       throw new Error(`No endpoint mapping for request type: ${request.type}`);
     }
 
-    const response = await httpClient.post(
-      `${supabaseUrl}/functions/v1/${endpoint}`,
-      {
+    // Use Supabase client to invoke edge functions
+    const { data, error } = await supabase.functions.invoke(endpoint, {
+      body: {
         ...request.data,
-        aiProvider: provider.name,
-        options: request.options
-      },
-      {
-        headers: { 'Authorization': `Bearer ${supabaseKey}` },
-        timeout: request.options?.timeout || 30000
+        model: provider.name === 'openai' ? 'gpt-3.5-turbo' : 'gemini-1.5-flash'
       }
-    );
+    });
 
-    return response.data;
+    if (error) {
+      throw new Error(`Edge function error: ${error.message}`);
+    }
+
+    return data;
   }
 
   private updateProviderPerformance(providerName: string, metadata: AIResponse['metadata']): void {

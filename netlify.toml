@@ -5,16 +5,35 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
 [template.environment]
-  VITE_GOOGLE_AI_API_KEY = "Required Google AI API key for Gemini models"
-  VITE_OPENAI_API_KEY = "Optional OpenAI API key"
-  VITE_ANTHROPIC_API_KEY = "Optional Anthropic API key"
+  VITE_SUPABASE_URL = "Your Supabase project URL"
+  VITE_SUPABASE_ANON_KEY = "Your Supabase anon key"
 
 [context.production]
   # Production environment settings
   environment = { NODE_ENV = "production", NPM_FLAGS = "" }
 
+[context.production.processing]
+  skip_processing = false
+
 [context.production.processing.html]
   # Add placeholder replacement for environment variables
   pretty_urls = true
-  transformers = ["./netlify/transforms/html.js"]
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

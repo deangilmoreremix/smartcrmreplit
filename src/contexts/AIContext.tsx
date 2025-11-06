@@ -8,7 +8,7 @@ import { aiOrchestrator, AIRequest, AIResponse } from '../services/ai-orchestrat
 import { contactAI, ContactInsight, ContactScore } from '../services/contact-ai.service';
 import { communicationAI } from '../services/communication-ai.service';
 import { logger } from '../services/logger.service';
-import { Contact } from '../types';
+import { Contact } from '../types/contact';
 
 interface AIState {
   // Processing states
@@ -244,7 +244,7 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       try {
         const providerStatus = aiOrchestrator.getProviderStatus();
         const performanceMetrics = aiOrchestrator.getPerformanceMetrics();
-        
+
         dispatch({ type: 'SET_PROVIDER_STATUS', payload: providerStatus });
         dispatch({ type: 'SET_PERFORMANCE_METRICS', payload: performanceMetrics });
       } catch (error) {
@@ -253,11 +253,47 @@ export const AIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     };
 
     loadSystemStatus();
-    const cleanupInterval = globalThis.setInterval ? globalThis.setInterval : setInterval;
-    const interval = cleanupInterval(loadSystemStatus, 30000); // Every 30 seconds
+    const interval = setInterval(loadSystemStatus, 30000); // Every 30 seconds
 
     return () => clearInterval(interval);
   }, []);
+
+  // Cache cleanup to prevent memory leaks
+  useEffect(() => {
+    const cleanupCache = () => {
+      const maxCacheSize = 100; // Limit cache size
+
+      // Clean up contact scores cache
+      if (state.contactScores.size > maxCacheSize) {
+        const entries = Array.from(state.contactScores.entries());
+        const toRemove = entries.slice(0, entries.length - maxCacheSize);
+        toRemove.forEach(([key]) => {
+          state.contactScores.delete(key);
+        });
+      }
+
+      // Clean up contact insights cache
+      if (state.contactInsights.size > maxCacheSize) {
+        const entries = Array.from(state.contactInsights.entries());
+        const toRemove = entries.slice(0, entries.length - maxCacheSize);
+        toRemove.forEach(([key]) => {
+          state.contactInsights.delete(key);
+        });
+      }
+
+      // Clean up email analyses cache
+      if (state.emailAnalyses.size > maxCacheSize) {
+        const entries = Array.from(state.emailAnalyses.entries());
+        const toRemove = entries.slice(0, entries.length - maxCacheSize);
+        toRemove.forEach(([key]) => {
+          state.emailAnalyses.delete(key);
+        });
+      }
+    };
+
+    const cleanupInterval = setInterval(cleanupCache, 300000); // Every 5 minutes
+    return () => clearInterval(cleanupInterval);
+  }, [state.contactScores.size, state.contactInsights.size, state.emailAnalyses.size]);
 
   // Action implementations
   const scoreContact = useCallback(async (contact: Contact, options?: any): Promise<ContactScore> => {
