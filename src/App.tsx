@@ -79,22 +79,25 @@ function App() {
                   <NavigationProvider>
                     <DashboardLayoutProvider>
                       <AIProvider>
-                      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-                        <Sidebar onOpenPipelineModal={() => {}} />
-                        <div className="flex-1 flex flex-col min-w-0">
                       <Suspense fallback={<LoadingSpinner message="Loading page..." size="lg" />}>
-                          <main className="flex-1 overflow-auto">
-                            <Routes>
-                              {/* Landing page */}
-                              <Route path="/" element={<LandingPage />} />
+                        <Routes>
+                          {/* Landing page - no sidebar */}
+                          <Route path="/" element={<LandingPage />} />
 
-                              {/* Auth routes */}
-                              <Route path="/auth" element={<div>Auth Page Coming Soon</div>} />
+                          {/* Auth routes */}
+                          <Route path="/auth" element={<div>Auth Page Coming Soon</div>} />
 
-                              {/* Redirect /dashboard to landing if not authenticated */}
-                              <Route path="/dashboard" element={<Navigate to="/" replace />} />
+                          {/* All other routes with sidebar */}
+                          <Route path="/*" element={
+                            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+                              <Sidebar onOpenPipelineModal={() => {}} />
+                              <div className="flex-1 flex flex-col min-w-0">
+                                <main className="flex-1 overflow-auto">
+                                  <Routes>
+                                    {/* Redirect /dashboard to landing if not authenticated */}
+                                    <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
-                              {/* Core pages */}
+                                    {/* Core pages */}
                               <Route
                                 path="/system-overview"
                                 element={
@@ -400,11 +403,13 @@ function App() {
 
                               {/* Fallback */}
                               <Route path="*" element={<Navigate to="/" replace />} />
-                            </Routes>
-                          </main>
-                      </Suspense>
-                      </div>
-                    </div>
+                                    </Routes>
+                                  </main>
+                                </div>
+                              </div>
+                            } />
+                          </Routes>
+                        </Suspense>
                   </AIProvider>
                 </DashboardLayoutProvider>
               </NavigationProvider>
