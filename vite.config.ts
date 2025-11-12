@@ -54,7 +54,7 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    exclude: ['lucide-react'], // add '@supabase/supabase-js' here only if needed
+    // Removed lucide-react exclusion to fix forwardRef bundling issues
   },
   define: {
     global: 'globalThis', // <- changed from 'window'

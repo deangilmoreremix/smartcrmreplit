@@ -20,6 +20,7 @@ import { LoadingSpinner } from './components/ui/LoadingSpinner';
 // Eager pages
 import Dashboard from './pages/Dashboard';
 import SystemOverview from './pages/SystemOverview';
+import LandingPage from './pages/landing/LandingPage';
 
 // Lazy pages
 const Tasks = lazy(() => import('./pages/Tasks'));
@@ -84,11 +85,14 @@ function App() {
                       <Suspense fallback={<LoadingSpinner message="Loading page..." size="lg" />}>
                           <main className="flex-1 overflow-auto">
                             <Routes>
+                              {/* Landing page */}
+                              <Route path="/" element={<LandingPage />} />
+
                               {/* Auth routes */}
                               <Route path="/auth" element={<div>Auth Page Coming Soon</div>} />
 
-                              {/* Redirect root to dashboard */}
-                              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                              {/* Redirect /dashboard to landing if not authenticated */}
+                              <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
                               {/* Core pages */}
                               <Route

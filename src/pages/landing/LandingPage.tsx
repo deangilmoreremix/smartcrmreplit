@@ -36,17 +36,17 @@ import LandingFooter from './components/LandingFooter';
 import PricingCard from './components/PricingCard';
 import FeatureCard from './components/FeatureCard';
 import TestimonialCard from './components/TestimonialCard';
-import AnimatedFeatureIcon from '../../components/Landing/AnimatedFeatureIcon';
-import FloatingIcons from '../../components/Landing/FloatingIcons';
-import ProductDemo from '../../components/Landing/ProductDemo';
-import ClientLogos from '../../components/Landing/ClientLogos';
-import StatCounter from '../../components/Landing/StatCounter';
-import FeatureShowcase from '../../components/Landing/FeatureShowcase';
-import ParallaxHero from '../../components/Landing/ParallaxHero';
-import ScrollAnimationWrapper from '../../components/Landing/ScrollAnimationWrapper';
-import FeatureDemo from '../../components/Landing/FeatureDemo';
-import InteractiveFeaturesGrid from '../../components/Landing/InteractiveFeaturesGrid';
-import ParticleBackground from '../../components/Landing/ParticleBackground';
+import AnimatedFeatureIcon from '../../components/landing/AnimatedFeatureIcon';
+import FloatingIcons from '../../components/landing/FloatingIcons';
+import ProductDemo from '../../components/landing/ProductDemo';
+import ClientLogos from '../../components/landing/ClientLogos';
+import StatCounter from '../../components/landing/StatCounter';
+import FeatureShowcase from '../../components/landing/FeatureShowcase';
+import ParallaxHero from '../../components/landing/ParallaxHero';
+import ScrollAnimationWrapper from '../../components/landing/ScrollAnimationWrapper';
+import FeatureDemo from '../../components/landing/FeatureDemo';
+import InteractiveFeaturesGrid from '../../components/landing/InteractiveFeaturesGrid';
+import ParticleBackground from '../../components/landing/ParticleBackground';
 
 const LandingPage = () => {
   const [isLoaded, setIsLoaded] = useState(false);
