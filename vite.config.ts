@@ -74,7 +74,7 @@ export default defineConfig({
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'react-vendor';
           }
-          if (id.includes('node_modules/lucide-react') || id.includes('node_modules/@headlessui')) {
+          if (id.includes('node_modules/lucide-react')) {
             return 'ui-vendor';
           }
           if (id.includes('node_modules/recharts') || id.includes('node_modules/react-big-calendar')) {
