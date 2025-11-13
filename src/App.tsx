@@ -14,8 +14,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FeatureProvider } from './contexts/FeatureContext';
 import { SidebarProvider } from './contexts/SidebarContext';
 import { FeatureGate } from './components/FeatureGate';
-import Sidebar from './components/Sidebar';
-import { LoadingSpinner } from './components/ui/LoadingSpinner';
+import ProtectedLayout from './components/ProtectedLayout';
+import ErrorBoundary from './components/ErrorBoundary';
+import { PageLoadingState } from './components/ui/LoadingStates';
 
 // Eager pages
 import Dashboard from './pages/Dashboard';
@@ -55,9 +56,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-    </div>;
+    return <PageLoadingState
+      title="Authenticating..."
+      description="Please wait while we verify your credentials"
+    />;
   }
 
   if (!isAuthenticated) {
@@ -73,45 +75,38 @@ function App() {
       <FeatureProvider>
         <SidebarProvider>
           <ThemeProvider>
-          <AIToolsProvider>
-            <ModalsProvider>
-              <EnhancedHelpProvider>
-                <VideoCallProvider>
-                  <NavigationProvider>
-                    <DashboardLayoutProvider>
-                      <AIProvider>
-                      <Suspense fallback={<LoadingSpinner message="Loading page..." size="lg" />}>
-                        <Routes>
-                          {/* Landing page - no sidebar */}
-                          <Route path="/" element={<LandingPage />} />
+            <AIToolsProvider>
+              <ModalsProvider>
+                <EnhancedHelpProvider>
+                  <VideoCallProvider>
+                    <NavigationProvider>
+                      <DashboardLayoutProvider>
+                        <AIProvider>
+                          <ErrorBoundary>
+                            <Suspense fallback={<PageLoadingState title="Loading SmartCRM" description="Please wait while we prepare your dashboard..." />}>
+                              <Routes>
+                              {/* Public routes - no sidebar */}
+                              <Route path="/" element={<LandingPage />} />
+                              <Route path="/auth" element={<AuthPage />} />
 
-                          {/* Auth routes */}
-                          <Route path="/auth" element={<AuthPage />} />
-
-                          {/* All other routes with sidebar */}
-                          <Route path="/*" element={
-                            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-                              <Sidebar onOpenPipelineModal={() => {}} />
-                              <div className="flex-1 flex flex-col min-w-0">
-                                <main className="flex-1 overflow-auto">
-                                  <Routes>
-                                    {/* Redirect /dashboard to landing if not authenticated */}
-                                    <Route path="/dashboard" element={<Navigate to="/" replace />} />
-
-                                    {/* Core pages */}
-                              <Route
-                                path="/system-overview"
-                                element={
-                                  <ProtectedRoute>
-                                    <SystemOverview />
-                                  </ProtectedRoute>
-                                }
-                              />
+                              {/* Protected routes with sidebar layout */}
                               <Route
                                 path="/dashboard"
                                 element={
                                   <ProtectedRoute>
-                                    <Dashboard />
+                                    <ProtectedLayout>
+                                      <Dashboard />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
+                              />
+                              <Route
+                                path="/system-overview"
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <SystemOverview />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
@@ -120,7 +115,9 @@ function App() {
                                 element={
                                   <ProtectedRoute>
                                     <FeatureGate feature="analytics">
-                                      <Analytics />
+                                      <ProtectedLayout>
+                                        <Analytics />
+                                      </ProtectedLayout>
                                     </FeatureGate>
                                   </ProtectedRoute>
                                 }
@@ -129,7 +126,9 @@ function App() {
                                 path="/ai-integration"
                                 element={
                                   <ProtectedRoute>
-                                    <AIIntegration />
+                                    <ProtectedLayout>
+                                      <AIIntegration />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
@@ -138,7 +137,9 @@ function App() {
                                 element={
                                   <ProtectedRoute>
                                     <FeatureGate feature="aiTools">
-                                      <AITools />
+                                      <ProtectedLayout>
+                                        <AITools />
+                                      </ProtectedLayout>
                                     </FeatureGate>
                                   </ProtectedRoute>
                                 }
@@ -148,7 +149,9 @@ function App() {
                                 element={
                                   <ProtectedRoute>
                                     <FeatureGate feature="pipeline">
-                                      <Pipeline />
+                                      <ProtectedLayout>
+                                        <Pipeline />
+                                      </ProtectedLayout>
                                     </FeatureGate>
                                   </ProtectedRoute>
                                 }
@@ -157,150 +160,245 @@ function App() {
                                 path="/mobile"
                                 element={
                                   <ProtectedRoute>
-                                    <MobileResponsiveness />
+                                    <ProtectedLayout>
+                                      <MobileResponsiveness />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
-
-                              {/* Contacts — details open as a modal inside this page */}
                               <Route
                                 path="/contacts"
                                 element={
                                   <ProtectedRoute>
-                                    <Contacts />
+                                    <ProtectedLayout>
+                                      <Contacts />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
-                              {/* Deep-link: /contacts/:id opens same page and the page handles auto-opening modal */}
                               <Route
                                 path="/contacts/:id"
                                 element={
                                   <ProtectedRoute>
-                                    <Contacts />
+                                    <ProtectedLayout>
+                                      <Contacts />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
-
-                              {/* Tasks & Calendar */}
                               <Route
                                 path="/tasks"
                                 element={
                                   <ProtectedRoute>
-                                    <TasksNew />
+                                    <ProtectedLayout>
+                                      <TasksNew />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
-                              {/* Calendar from navbar points here */}
                               <Route
                                 path="/appointments"
                                 element={
                                   <ProtectedRoute>
-                                    <TasksNew />
+                                    <ProtectedLayout>
+                                      <TasksNew />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
-                              {/* (If you still use the older Tasks page elsewhere) */}
                               <Route
                                 path="/tasks-legacy"
                                 element={
                                   <ProtectedRoute>
-                                    <Tasks />
+                                    <ProtectedLayout>
+                                      <Tasks />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
-
-                              {/* ===== Dropdown: Sales ===== */}
                               <Route
                                 path="/sales-tools"
-                                element={<PlaceholderPage title="Sales Tools" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Sales Tools" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/lead-automation"
-                                element={<PlaceholderPage title="Lead Automation" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Lead Automation" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/circle-prospecting"
-                                element={<PlaceholderPage title="Circle Prospecting" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Circle Prospecting" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
-                              {/* Appointments already routed to /appointments above */}
                               <Route
                                 path="/phone-system"
                                 element={
-                                  <FeatureGate feature="phoneSystem">
-                                    <PlaceholderPage title="Phone System" />
-                                  </FeatureGate>
+                                  <ProtectedRoute>
+                                    <FeatureGate feature="phoneSystem">
+                                      <ProtectedLayout>
+                                        <PlaceholderPage title="Phone System" />
+                                      </ProtectedLayout>
+                                    </FeatureGate>
+                                  </ProtectedRoute>
                                 }
                               />
                               <Route
                                 path="/invoicing"
                                 element={
-                                  <FeatureGate feature="invoicing">
-                                    <PlaceholderPage title="Invoicing" />
-                                  </FeatureGate>
+                                  <ProtectedRoute>
+                                    <FeatureGate feature="invoicing">
+                                      <ProtectedLayout>
+                                        <PlaceholderPage title="Invoicing" />
+                                      </ProtectedLayout>
+                                    </FeatureGate>
+                                  </ProtectedRoute>
                                 }
                               />
                               <Route
                                 path="/sales-analytics"
-                                element={<PlaceholderPage title="Sales Analytics" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Sales Analytics" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/quote-builder"
-                                element={<PlaceholderPage title="Quote Builder" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Quote Builder" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/commission-tracker"
-                                element={<PlaceholderPage title="Commission Tracker" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Commission Tracker" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/follow-up-reminders"
-                                element={<PlaceholderPage title="Follow-up Reminders" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Follow-up Reminders" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/territory-management"
-                                element={<PlaceholderPage title="Territory Management" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Territory Management" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
-
-                              {/* ===== Dropdown: Tasks ===== */}
                               <Route
                                 path="/task-automation"
-                                element={<PlaceholderPage title="Task Automation" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Task Automation" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/project-tracker"
-                                element={<PlaceholderPage title="Project Tracker" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Project Tracker" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/time-tracking"
-                                element={<PlaceholderPage title="Time Tracking" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Time Tracking" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/workflow-builder"
-                                element={<PlaceholderPage title="Workflow Builder" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Workflow Builder" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/deadline-manager"
-                                element={<PlaceholderPage title="Deadline Manager" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Deadline Manager" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
-
-                              {/* ===== Dropdown: Communication ===== */}
                               <Route
                                 path="/video-email"
                                 element={
-                                  <FeatureGate feature="videoEmail">
-                                    <PlaceholderPage title="Video Email" />
-                                  </FeatureGate>
+                                  <ProtectedRoute>
+                                    <FeatureGate feature="videoEmail">
+                                      <ProtectedLayout>
+                                        <PlaceholderPage title="Video Email" />
+                                      </ProtectedLayout>
+                                    </FeatureGate>
+                                  </ProtectedRoute>
                                 }
                               />
                               <Route
                                 path="/text-messages"
-                                element={<PlaceholderPage title="Text Messages" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Text Messages" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
-                              {/* Email Composer goes to Communication page you already have */}
                               <Route
                                 path="/email-composer"
                                 element={
                                   <ProtectedRoute>
-                                    <Communication />
+                                    <ProtectedLayout>
+                                      <Communication />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
@@ -308,73 +406,149 @@ function App() {
                                 path="/communication"
                                 element={
                                   <ProtectedRoute>
-                                    <Communication />
+                                    <ProtectedLayout>
+                                      <Communication />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
                               <Route
                                 path="/campaigns"
-                                element={<PlaceholderPage title="Campaigns" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Campaigns" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/group-calls"
-                                element={<PlaceholderPage title="Group Calls" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Group Calls" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/call-recording"
-                                element={<PlaceholderPage title="Call Recording" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Call Recording" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/in-call-messaging"
-                                element={<PlaceholderPage title="In-Call Messaging" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="In-Call Messaging" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/call-analytics"
-                                element={<PlaceholderPage title="Call Analytics" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Call Analytics" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/connection-quality"
-                                element={<PlaceholderPage title="Connection Quality Monitor" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Connection Quality Monitor" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
-
-                              {/* ===== Dropdown: Content ===== */}
                               <Route
                                 path="/content-library"
-                                element={<PlaceholderPage title="Content Library" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Content Library" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/voice-profiles"
-                                element={<PlaceholderPage title="Voice Profiles" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Voice Profiles" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/business-analysis"
-                                element={<PlaceholderPage title="Business Analysis" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Business Analysis" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/image-generator"
-                                element={<PlaceholderPage title="Image Generator" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Image Generator" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/forms"
-                                element={<PlaceholderPage title="Forms" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Forms" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
                               <Route
                                 path="/ai-model-demo"
-                                element={<PlaceholderPage title="AI Model Demo" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="AI Model Demo" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
-
-                              {/* ===== Apps dropdown internal links ===== */}
                               <Route
                                 path="/white-label"
-                                element={<PlaceholderPage title="White-Label Customization" />}
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="White-Label Customization" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
                               />
-
-                              {/* Admin Routes */}
                               <Route
                                 path="/super-admin"
                                 element={
                                   <ProtectedRoute>
-                                    <SuperAdminDashboard />
+                                    <ProtectedLayout>
+                                      <SuperAdminDashboard />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
@@ -382,46 +556,79 @@ function App() {
                                 path="/user-management"
                                 element={
                                   <ProtectedRoute>
-                                    <UserManagement />
+                                    <ProtectedLayout>
+                                      <UserManagement />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
+                              />
+                              <Route
+                                path="/settings"
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Settings" description="Settings page coming soon" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
+                              />
+                              <Route
+                                path="/ai-goals"
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="AI Goals" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
+                              />
+                              <Route
+                                path="/features/ai-tools"
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="AI Tools Features" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
+                              />
+                              <Route
+                                path="/features/contacts"
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Contact Management Features" />
+                                    </ProtectedLayout>
+                                  </ProtectedRoute>
+                                }
+                              />
+                              <Route
+                                path="/features/pipeline"
+                                element={
+                                  <ProtectedRoute>
+                                    <ProtectedLayout>
+                                      <PlaceholderPage title="Pipeline Features" />
+                                    </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
                               />
 
-                              {/* Misc / Settings */}
-                              <Route
-                                path="/settings"
-                                element={<PlaceholderPage title="Settings" description="Settings page coming soon" />}
-                              />
-                              <Route
-                                path="/ai-goals"
-                                element={<PlaceholderPage title="AI Goals" />}
-                              />
-
-                              {/* Feature showcase routes (optional) */}
-                              <Route path="/features/ai-tools" element={<PlaceholderPage title="AI Tools Features" />} />
-                              <Route path="/features/contacts" element={<PlaceholderPage title="Contact Management Features" />} />
-                              <Route path="/features/pipeline" element={<PlaceholderPage title="Pipeline Features" />} />
-
                               {/* Fallback */}
                               <Route path="*" element={<Navigate to="/" replace />} />
-                                    </Routes>
-                                  </main>
-                                </div>
-                              </div>
-                            } />
-                          </Routes>
-                        </Suspense>
-                  </AIProvider>
-                </DashboardLayoutProvider>
-              </NavigationProvider>
-            </VideoCallProvider>
-          </EnhancedHelpProvider>
-        </ModalsProvider>
-      </AIToolsProvider>
-    </ThemeProvider>
-    </SidebarProvider>
-    </FeatureProvider>
-  </AuthProvider>
+                            </Routes>
+                          </Suspense>
+                        </ErrorBoundary>
+                      </AIProvider>
+                      </DashboardLayoutProvider>
+                    </NavigationProvider>
+                  </VideoCallProvider>
+                </EnhancedHelpProvider>
+              </ModalsProvider>
+            </AIToolsProvider>
+          </ThemeProvider>
+        </SidebarProvider>
+      </FeatureProvider>
+    </AuthProvider>
   );
 }
 

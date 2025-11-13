@@ -10,6 +10,7 @@ import { useDashboardLayout } from '../contexts/DashboardLayoutContext';
 import { useFeatures } from '../contexts/FeatureContext';
 import DraggableSection from './DraggableSection';
 import DashboardLayoutControls from './DashboardLayoutControls';
+import { DashboardSkeleton, DataLoadingState } from './ui/LoadingStates';
 
 // Import section components
 import ExecutiveOverviewSection from './sections/ExecutiveOverviewSection';
@@ -152,28 +153,33 @@ const Dashboard: React.FC = React.memo(() => {
 
   return (
     <main className="w-full h-full overflow-y-auto max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
-      {/* Dashboard Layout Controls */}
-      <DashboardLayoutControls />
+      <DataLoadingState
+        isLoading={isLoading}
+        loadingComponent={<DashboardSkeleton />}
+      >
+        {/* Dashboard Layout Controls */}
+        <DashboardLayoutControls />
 
-      {/* Draggable Sections */}
-      <div className="space-y-8 pb-20">
-        {sectionOrder.map((sectionId, index) => (
-          <DraggableSection
-            key={sectionId}
-            sectionId={sectionId}
-            index={index}
-          >
-            <div id={sectionId}>
-              {renderSectionContent(sectionId)}
-            </div>
-          </DraggableSection>
-        ))}
-      </div>
+        {/* Draggable Sections */}
+        <div className="space-y-8 pb-20">
+          {sectionOrder.map((sectionId, index) => (
+            <DraggableSection
+              key={sectionId}
+              sectionId={sectionId}
+              index={index}
+            >
+              <div id={sectionId}>
+                {renderSectionContent(sectionId)}
+              </div>
+            </DraggableSection>
+          ))}
+        </div>
 
-      {/* Video Call Components */}
-      <PersistentVideoCallButton />
-      <VideoCallPreviewWidget />
-      <VideoCallOverlay />
+        {/* Video Call Components */}
+        <PersistentVideoCallButton />
+        <VideoCallPreviewWidget />
+        <VideoCallOverlay />
+      </DataLoadingState>
     </main>
   );
 });
