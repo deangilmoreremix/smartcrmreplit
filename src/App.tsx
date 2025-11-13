@@ -21,6 +21,7 @@ import { LoadingSpinner } from './components/ui/LoadingSpinner';
 import Dashboard from './pages/Dashboard';
 import SystemOverview from './pages/SystemOverview';
 import LandingPage from './pages/landing/LandingPage';
+import AuthPage from './pages/AuthPage';
 
 // Lazy pages
 const Tasks = lazy(() => import('./pages/Tasks'));
@@ -85,7 +86,7 @@ function App() {
                           <Route path="/" element={<LandingPage />} />
 
                           {/* Auth routes */}
-                          <Route path="/auth" element={<div>Auth Page Coming Soon</div>} />
+                          <Route path="/auth" element={<AuthPage />} />
 
                           {/* All other routes with sidebar */}
                           <Route path="/*" element={

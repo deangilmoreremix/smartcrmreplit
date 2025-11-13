@@ -107,10 +107,10 @@ const LandingHeader: React.FC = () => {
           
           {/* Auth Buttons */}
           <div className="hidden lg:flex items-center space-x-4">
-            <Link to="/login" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <Link to="/auth" className="text-gray-700 hover:text-blue-600 transition-colors">
               Log In
             </Link>
-            <Link to="/register" className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg hover:shadow-md transition duration-300">
+            <Link to="/auth" className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg hover:shadow-md transition duration-300">
               Sign Up
             </Link>
           </div>
@@ -191,10 +191,10 @@ const LandingHeader: React.FC = () => {
               Contact
             </Link>
             <div className="pt-4 mt-2 border-t border-gray-100 flex flex-col space-y-3">
-              <Link to="/login" className="px-4 py-2 text-center border border-gray-300 rounded-lg text-gray-700">
+              <Link to="/auth" className="px-4 py-2 text-center border border-gray-300 rounded-lg text-gray-700">
                 Log In
               </Link>
-              <Link to="/register" className="px-4 py-2 text-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg">
+              <Link to="/auth" className="px-4 py-2 text-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium rounded-lg">
                 Sign Up
               </Link>
             </div>
