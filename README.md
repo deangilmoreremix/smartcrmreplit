@@ -1,12 +1,8 @@
-<<<<<<< HEAD
-# smartcrmreplit
-Replit smartcrm deploy 
-=======
 # SmartCRM Dashboard
 
 A modern, AI-powered Customer Relationship Management (CRM) dashboard with glassmorphic design and advanced features for sales teams.
 
-![SmartCRM Dashboard](https://images.pexels.com/photos/7256697/pexels-photo-7256697.jpeg?auto=compress&cs=tinysrgb&w=800&h=450&dpr=2)
+![SmartCRM Dashboard](./public/icon.svg)
 
 ## Overview
 
@@ -325,4 +321,3 @@ WebRTC features (video calling) require browser permissions for camera and micro
 ## License
 
 MIT License
->>>>>>> d0d16dd (Added Contacts copy copy.tsx)
