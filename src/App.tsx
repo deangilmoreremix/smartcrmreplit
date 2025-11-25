@@ -23,6 +23,8 @@ import Dashboard from './pages/Dashboard';
 import SystemOverview from './pages/SystemOverview';
 import LandingPage from './pages/landing/LandingPage';
 import AuthPage from './pages/AuthPage';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 // Lazy pages
 const Tasks = lazy(() => import('./pages/Tasks'));
@@ -85,9 +87,11 @@ function App() {
                           <ErrorBoundary>
                             <Suspense fallback={<PageLoadingState title="Loading SmartCRM" description="Please wait while we prepare your dashboard..." />}>
                               <Routes>
-                              {/* Public routes - no sidebar */}
-                              <Route path="/" element={<LandingPage />} />
-                              <Route path="/auth" element={<AuthPage />} />
+                                {/* Public routes - no sidebar */}
+                                <Route path="/" element={<LandingPage />} />
+                                <Route path="/auth" element={<AuthPage />} />
+                                <Route path="/auth/recovery" element={<ForgotPassword />} />
+                                <Route path="/auth/reset-password" element={<ResetPassword />} />
 
                               {/* Protected routes with sidebar layout */}
                               <Route

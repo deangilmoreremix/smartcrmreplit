@@ -116,6 +116,18 @@ const AuthPage: React.FC = () => {
             >
               {loading ? 'Signing In...' : (isLogin ? 'Sign In' : 'Create Account')}
             </button>
+
+            {/* Forgot Password Link */}
+            {isLogin && (
+              <div className="text-center">
+                <Link
+                  to="/auth/recovery"
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
+            )}
           </form>
 
           {/* Toggle between login/signup */}
