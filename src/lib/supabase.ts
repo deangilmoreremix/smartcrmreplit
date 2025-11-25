@@ -84,7 +84,31 @@ export const validateConfiguration = () => {
   return true;
 };
 
+// Add connectivity check
+export const checkSupabaseConnection = async () => {
+  if (!isConfigured) {
+    console.warn('Supabase not configured properly. Using fallback AI model configurations.');
+    return false;
+  }
+
+  try {
+    // Try a simple query to check if Supabase is reachable
+    const { error } = await supabase.from('profiles').select('count').limit(1).single();
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" which is OK
+      throw error;
+    }
+    console.log('Supabase connection validated successfully');
+    return true;
+  } catch (error) {
+    console.error('Supabase connection failed:', error);
+    console.warn('Supabase not configured properly. Using fallback AI model configurations.');
+    return false;
+  }
+};
+
 // Initialize configuration validation
 if (typeof window !== 'undefined') {
   validateConfiguration();
+  // Check Supabase connectivity
+  checkSupabaseConnection();
 }
