@@ -34,17 +34,32 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  console.log('🔐 AuthProvider: Initializing...');
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔐 AuthProvider: Setting up auth listeners...');
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        await loadUserProfile(session.user.id);
+      try {
+        console.log('🔐 AuthProvider: Getting initial session...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('🔐 AuthProvider: Error getting session:', error);
+        }
+        if (session?.user) {
+          console.log('🔐 AuthProvider: Found existing session, loading profile...');
+          await loadUserProfile(session.user.id);
+        } else {
+          console.log('🔐 AuthProvider: No existing session found');
+        }
+        setIsLoading(false);
+        console.log('🔐 AuthProvider: Initial session check complete');
+      } catch (error) {
+        console.error('🔐 AuthProvider: Error in getInitialSession:', error);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     getInitialSession();
@@ -52,6 +67,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔐 AuthProvider: Auth state changed:', event, session?.user ? 'user present' : 'no user');
         if (session?.user) {
           await loadUserProfile(session.user.id);
         } else {
@@ -66,14 +82,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loadUserProfile = async (userId: string) => {
     try {
+      console.log('🔐 AuthProvider: Loading user profile for:', userId);
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('🔐 AuthProvider: Error fetching profile:', error);
+        throw error;
+      }
 
+      console.log('🔐 AuthProvider: Profile loaded successfully:', profile.email);
       setUser({
         id: profile.id,
         email: profile.email,
@@ -82,10 +103,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         permissions: profile.permissions || []
       });
     } catch (error) {
-      console.error('Error loading user profile:', error);
+      console.error('🔐 AuthProvider: Error loading user profile:', error);
       // Fallback to basic user info
+      console.log('🔐 AuthProvider: Attempting fallback user info...');
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
+        console.log('🔐 AuthProvider: Using fallback user info');
         setUser({
           id: authUser.id,
           email: authUser.email || '',
@@ -93,6 +116,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           name: authUser.email || '',
           permissions: []
         });
+      } else {
+        console.log('🔐 AuthProvider: No fallback user info available');
       }
     }
   };
