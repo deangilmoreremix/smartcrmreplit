@@ -31,15 +31,11 @@ export interface AIToolDefinition {
   id: string;
   title: string;
   description: string;
-  category: 'Email' | 'Sales' | 'Research' | 'Meetings' | 'Content' | 'Assistant' | 'Analytics' | 'Reasoning' | 'Forms' | 'Docs';
+  category: 'Email' | 'Sales' | 'Research' | 'Meetings' | 'Content' | 'Assistant' | 'Analytics' | 'Forms' | 'Docs';
   icon: LucideIcon;
   component: React.LazyExoticComponent<React.ComponentType<any>>;
 }
 
-const ReasoningEmail = lazy(async () => {
-  const { default: ReasoningContentGenerator } = await import('./ReasoningContentGenerator');
-  return { default: () => <ReasoningContentGenerator contentType="email" /> };
-});
 
 export const AI_TOOLS: AIToolDefinition[] = [
   // Email
@@ -50,17 +46,14 @@ export const AI_TOOLS: AIToolDefinition[] = [
 
   // Sales
   { id: 'live-deal-analysis', title: 'Live Deal Analysis', description: 'AI risk, win probability and next actions for your pipeline deals.', category: 'Sales', icon: BarChart3, component: lazy(() => import('./LiveDealAnalysis')) },
-  { id: 'call-script', title: 'Call Script', description: 'A call script tailored to the contact and their history.', category: 'Sales', icon: Phone, component: lazy(() => import('./CallScriptContent')) },
-  { id: 'call-script-generator', title: 'Call Script Generator', description: 'Scripts for cold calls, discovery, follow-ups and closing.', category: 'Sales', icon: Phone, component: lazy(() => import('./CallScriptGenerator')) },
+  { id: 'call-script', title: 'Call Script', description: 'A call script tailored to the contact, purpose and history, with the reasoning behind it.', category: 'Sales', icon: Phone, component: lazy(() => import('./CallScriptContent')) },
   { id: 'objection-handler', title: 'Objection Handler', description: 'Turn common objections into structured responses.', category: 'Sales', icon: AlertTriangle, component: lazy(() => import('./ObjectionHandlerContent')) },
   { id: 'proposal-generator', title: 'Proposal Generator', description: 'Generate a structured business proposal.', category: 'Sales', icon: FileText, component: lazy(() => import('./ProposalGenerator')) },
 
   // Research
   { id: 'competitor-analysis', title: 'Competitor Analysis', description: 'Battlecard-style analysis, optionally from uploaded material.', category: 'Research', icon: Shield, component: lazy(() => import('./CompetitorAnalysisContent')) },
-  { id: 'competitor-analysis-main', title: 'Competitor Analysis (Detailed)', description: 'Positioning, strengths/weaknesses and pricing analysis.', category: 'Research', icon: Shield, component: lazy(() => import('./CompetitorAnalysis')) },
   { id: 'customer-persona', title: 'Customer Persona', description: 'Build an ideal customer persona from industry and pain points.', category: 'Research', icon: Users, component: lazy(() => import('./CustomerPersonaContent')) },
-  { id: 'market-trends', title: 'Market Trends', description: 'Trends, drivers and recommendations for a market.', category: 'Research', icon: TrendingUp, component: lazy(() => import('./MarketTrendContent')) },
-  { id: 'market-trends-analysis', title: 'Market Trends (Analysis)', description: 'Industry trend analysis over a chosen timeframe.', category: 'Analytics', icon: TrendingUp, component: lazy(() => import('./MarketTrendsAnalysis')) },
+  { id: 'market-trends', title: 'Market Trends', description: 'Trends, drivers and recommendations for a market, optionally from uploaded reports.', category: 'Research', icon: TrendingUp, component: lazy(() => import('./MarketTrendContent')) },
 
   // Meetings
   { id: 'meeting-agenda', title: 'Meeting Agenda', description: 'A timed agenda with owners and outcomes.', category: 'Meetings', icon: Calendar, component: lazy(() => import('./MeetingAgendaContent')) },
@@ -82,12 +75,6 @@ export const AI_TOOLS: AIToolDefinition[] = [
   { id: 'churn-prediction', title: 'Churn Prediction', description: 'Churn risk and retention actions for a customer.', category: 'Analytics', icon: PieChart, component: lazy(() => import('./ChurnPrediction')) },
   { id: 'ai-usage-stats-panel', title: 'AI Usage Stats', description: 'Which AI tools your team uses most.', category: 'Analytics', icon: Eye, component: lazy(() => import('./AIUsageStatsPanel')) },
 
-  // Reasoning
-  { id: 'reasoning-email', title: 'Reasoning Email', description: 'Plan the angle step by step, then write the email.', category: 'Reasoning', icon: Mail, component: ReasoningEmail },
-  { id: 'reasoning-proposal-generator', title: 'Reasoning Proposal', description: 'Reason about needs and risks, then draft the proposal.', category: 'Reasoning', icon: FileText, component: lazy(() => import('./ReasoningProposalGenerator')) },
-  { id: 'reasoning-script-generator', title: 'Reasoning Script', description: 'Plan the call strategy, then write the script.', category: 'Reasoning', icon: Phone, component: lazy(() => import('./ReasoningScriptGenerator')) },
-  { id: 'reasoning-objection-handler', title: 'Reasoning Objection', description: 'Diagnose the real concern, then respond.', category: 'Reasoning', icon: AlertTriangle, component: lazy(() => import('./ReasoningObjectionHandler')) },
-  { id: 'reasoning-social-content', title: 'Reasoning Social', description: 'Reason about audience and platform, then write the post.', category: 'Reasoning', icon: Megaphone, component: lazy(() => import('./ReasoningSocialContent')) },
 
   // Forms & docs
   { id: 'auto-form-completer', title: 'Auto Form Completer', description: 'Paste free text and AI fills in the lead form.', category: 'Forms', icon: Zap, component: lazy(() => import('./AutoFormCompleter')) },
@@ -111,6 +98,15 @@ export const AI_TOOL_ALIASES: Record<string, string> = {
   'vision-analyzer': 'document-analyzer-realtime',
   'voice-tone-optimizer': 'voice-analysis-realtime',
   'subject-optimizer': 'email-composer-content',
+  // Duplicates merged into a single tool per job:
+  'call-script-generator': 'call-script',
+  'reasoning-script-generator': 'call-script',
+  'competitor-analysis-main': 'competitor-analysis',
+  'market-trends-analysis': 'market-trends',
+  'reasoning-email': 'email-composer-content',
+  'reasoning-proposal-generator': 'proposal-generator',
+  'reasoning-objection-handler': 'objection-handler',
+  'reasoning-social-content': 'social-media-generator',
 };
 
 export const AI_TOOL_CATEGORIES = Array.from(new Set(AI_TOOLS.map((t) => t.category)));
