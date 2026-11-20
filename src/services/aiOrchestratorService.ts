@@ -48,7 +48,7 @@ class AIOrchestratorService {
 
   private initializeStats() {
     const models = [
-      'gpt-4o-mini', 'gpt-4o'
+      'gpt-6.2-sol', 'gpt-4o'
     ];
 
     models.forEach(model => {
@@ -163,7 +163,7 @@ class AIOrchestratorService {
 
     void modelType;
     // All AI runs on OpenAI via the server-side gateway; the server applies its default model.
-    return 'gpt-4o-mini';
+    return 'gpt-6.2-sol';
   }
 
   /**
@@ -531,7 +531,7 @@ class AIOrchestratorService {
     // For complex analytical tasks like deal analysis, prefer more capable models
     const useGPT4 = dealData.deals && dealData.deals.some((deal: any) => deal.value > 100000) || 
                    taskContext.complexity === 'high';
-    const defaultModelId = 'gpt-4o-mini';
+    const defaultModelId = 'gpt-6.2-sol';
     
     const modelId = await this.getOptimalModel('deal_insights', {
       ...taskContext,
@@ -640,7 +640,7 @@ class AIOrchestratorService {
     // For contact analysis, prefer models with good pattern recognition
     const modelId = await this.getOptimalModel('contact_scoring', {
       ...taskContext,
-      modelId: taskContext.modelId || 'gpt-4o-mini'
+      modelId: taskContext.modelId || 'gpt-6.2-sol'
     });
     
     const startTime = Date.now();
@@ -731,13 +731,9 @@ class AIOrchestratorService {
    */
   private estimateCost(modelId: string, tokens: number): number {
     const pricing: Record<string, number> = {
-      'gemma-2-2b-it': 0.00000035, // per token
-      'gemma-2-9b-it': 0.00000050, // per token
-      'gemma-2-27b-it': 0.00000125, // per token
-      'gemini-2.5-flash': 0.00000075, // per token
-      'gemini-2.5-flash-8b': 0.00000035, // per token
-      'gpt-4o-mini': 0.00015, // per token
-      'gpt-3.5-turbo': 0.0000015, // per token
+      'gpt-6.2-sol': 0.000002, // per input token ($2 / 1M)
+      'gpt-6.2-astra': 0.000008, // per input token ($8 / 1M)
+      'gpt-4o-mini': 0.00000015, // per input token
     };
 
     return tokens * (pricing[modelId] || 0.0000015);

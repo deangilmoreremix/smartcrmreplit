@@ -36,33 +36,33 @@ export interface AIUsageLog {
 
 // Fallback model configurations when database is not available
 const FALLBACK_MODELS: Record<string, AIModelConfig> = {
-  'gpt-4o-mini': {
-    id: 'gpt-4o-mini',
+  'gpt-6.2-sol': {
+    id: 'gpt-6.2-sol',
     provider: 'openai',
-    model_name: 'gpt-4o-mini',
-    display_name: 'GPT-4o mini',
-    pricing: { input_per_1m_tokens: 0.15, output_per_1m_tokens: 0.6 },
+    model_name: 'gpt-6.2-sol',
+    display_name: 'GPT-6.2 Sol',
+    pricing: { input_per_1m_tokens: 2, output_per_1m_tokens: 10 },
     capabilities: ['text-generation', 'reasoning', 'function-calling', 'json-mode', 'system-instructions'],
-    context_window: 128000,
-    max_tokens: 16384,
+    context_window: 1050000,
+    max_tokens: 128000,
     is_active: true,
     is_recommended: true,
-    description: 'Fast, low-cost default model',
+    description: 'Default model for everyday CRM tasks',
     created_at: new Date(),
     updated_at: new Date()
   },
-  'gpt-4o': {
-    id: 'gpt-4o',
+  'gpt-6.2-astra': {
+    id: 'gpt-6.2-astra',
     provider: 'openai',
-    model_name: 'gpt-4o',
-    display_name: 'GPT-4o',
-    pricing: { input_per_1m_tokens: 2.5, output_per_1m_tokens: 10 },
+    model_name: 'gpt-6.2-astra',
+    display_name: 'GPT-6.2 Astra',
+    pricing: { input_per_1m_tokens: 8, output_per_1m_tokens: 40 },
     capabilities: ['text-generation', 'reasoning', 'function-calling', 'json-mode', 'system-instructions'],
-    context_window: 128000,
-    max_tokens: 16384,
+    context_window: 272000,
+    max_tokens: 128000,
     is_active: true,
     is_recommended: false,
-    description: 'Higher-quality model for complex tasks',
+    description: 'More capable model for difficult work',
     created_at: new Date(),
     updated_at: new Date()
   },

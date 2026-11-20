@@ -12,7 +12,7 @@ const IntegrationsSystem: React.FC = () => {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   // OpenAI is configured server-side (OPENAI_API_KEY in Netlify); ask the AI gateway.
   const [isOpenAIConnected, setIsOpenAIConnected] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(getPreferredModel() || 'gpt-4o-mini');
+  const [selectedModel, setSelectedModel] = useState(getPreferredModel() || 'gpt-6.2-sol');
   useEffect(() => {
     getAIStatus()
       .then((s) => setIsOpenAIConnected(s.configured))

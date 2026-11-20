@@ -8,7 +8,9 @@
  *
  * Environment variables (set in Netlify → Site configuration → Environment variables):
  *   OPENAI_API_KEY            OpenAI API key (required)
- *   OPENAI_MODEL              default chat model            (default: gpt-4o-mini)
+ *   OPENAI_MODEL              default model, called via the Responses API (default: gpt-6.2-sol)
+ *   OPENAI_REASONING_EFFORT   reasoning effort for reasoning models: minimal|low|medium|high|xhigh|max
+ *                             (default: low — fast enough for interactive CRM tools)
  *   OPENAI_IMAGE_MODEL        image model                   (default: gpt-image-1)
  *   OPENAI_TRANSCRIBE_MODEL   speech-to-text model          (default: whisper-1)
  *   OPENAI_EMBEDDING_MODEL    embedding model               (default: text-embedding-3-small)
@@ -44,7 +46,8 @@ const env = (name: string): string | undefined => {
 };
 
 const OPENAI_KEY = () => env('OPENAI_API_KEY');
-const OPENAI_MODEL = () => env('OPENAI_MODEL') || 'gpt-4o-mini';
+const OPENAI_MODEL = () => env('OPENAI_MODEL') || 'gpt-6.2-sol';
+const REASONING_EFFORT = () => env('OPENAI_REASONING_EFFORT') || 'low';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -116,7 +119,8 @@ function buildMessages(body: ChatRequest): ChatMessage[] {
   return messages;
 }
 
-const isReasoningModel = (model: string) => /^(o\d|gpt-5)/i.test(model);
+// Reasoning models (o-series, GPT-5/6 families) don't take temperature and accept reasoning.effort.
+const isReasoningModel = (model: string) => /^(o\d|gpt-5|gpt-6)/i.test(model);
 
 async function providerError(res: Response, provider: string): Promise<never> {
   let detail = '';
@@ -132,55 +136,126 @@ async function providerError(res: Response, provider: string): Promise<never> {
 // ---------------------------------------------------------------------------
 // OpenAI
 // ---------------------------------------------------------------------------
+/**
+ * Convert the chat-style message list the app uses into Responses API input items.
+ * - system messages become `instructions`
+ * - assistant tool_calls become `function_call` items, tool messages `function_call_output`
+ * - images/PDFs are attached to the last user message as input_image / input_file parts
+ */
+function toResponsesInput(messages: ChatMessage[], images: string[] = []) {
+  const instructions = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
+  const input: any[] = [];
+  const lastUser = messages.map((m) => m.role).lastIndexOf('user');
+
+  messages.forEach((m, i) => {
+    if (m.role === 'system') return;
+    if (m.role === 'tool') {
+      input.push({ type: 'function_call_output', call_id: m.tool_call_id, output: m.content || '' });
+      return;
+    }
+    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      if (m.content) input.push({ role: 'assistant', content: m.content });
+      for (const call of m.tool_calls as any[]) {
+        input.push({
+          type: 'function_call',
+          call_id: call.id,
+          name: call.function?.name ?? call.name,
+          arguments: call.function?.arguments ?? call.arguments ?? '{}',
+        });
+      }
+      return;
+    }
+    if (m.role === 'user' && i === lastUser && images.length) {
+      input.push({
+        role: 'user',
+        content: [
+          { type: 'input_text', text: m.content || '' },
+          ...images.map((url, n) =>
+            url.startsWith('data:application/pdf')
+              ? { type: 'input_file', filename: `document-${n + 1}.pdf`, file_data: url }
+              : { type: 'input_image', image_url: url },
+          ),
+        ],
+      });
+      return;
+    }
+    input.push({ role: m.role, content: m.content || '' });
+  });
+  return { instructions, input };
+}
+
+/** Accept tools in Chat Completions shape ({type, function:{...}}) or Responses shape (flat). */
+function toResponsesTools(tools: unknown[] = []) {
+  return tools.map((t: any) => (t.function ? { type: 'function', ...t.function } : t));
+}
+
+function extractText(data: any): string {
+  if (typeof data.output_text === 'string') return data.output_text;
+  return (data.output || [])
+    .filter((item: any) => item.type === 'message')
+    .flatMap((item: any) => item.content || [])
+    .map((part: any) => (part.type === 'output_text' ? part.text : part.type === 'refusal' ? part.refusal : ''))
+    .join('');
+}
+
 async function openaiChat(body: ChatRequest) {
   const key = OPENAI_KEY();
   if (!key) {
     throw new HttpError(503, 'AI is not configured: add OPENAI_API_KEY to your Netlify environment variables.');
   }
-  // Only honour client model overrides that are OpenAI chat models.
+  // Only honour client model overrides that are OpenAI models.
   const model = body.model && /^(gpt-|o\d|chatgpt)/i.test(body.model) ? body.model : OPENAI_MODEL();
-  const messages: any[] = buildMessages(body);
+  const reasoning = isReasoningModel(model);
+  const { instructions, input } = toResponsesInput(buildMessages(body), body.images);
 
-  if (body.images?.length) {
-    // Attach images to the last user message.
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') {
-        messages[i] = {
-          role: 'user',
-          content: [
-            { type: 'text', text: messages[i].content || '' },
-            ...body.images.map((url, n) =>
-              url.startsWith('data:application/pdf')
-                ? { type: 'file', file: { filename: `document-${n + 1}.pdf`, file_data: url } }
-                : { type: 'image_url', image_url: { url } },
-            ),
-          ],
-        };
-        break;
-      }
+  const payload: Record<string, unknown> = { model, input, store: false };
+  if (instructions) payload.instructions = instructions;
+  if (reasoning) payload.reasoning = { effort: REASONING_EFFORT() };
+  else if (body.temperature !== undefined) payload.temperature = body.temperature;
+  // max_output_tokens includes reasoning tokens, so leave headroom on reasoning models.
+  if (body.maxTokens) payload.max_output_tokens = reasoning ? body.maxTokens + 4096 : body.maxTokens;
+  if (body.json) payload.text = { format: { type: 'json_object' } };
+  if (body.tools?.length) payload.tools = toResponsesTools(body.tools);
+
+  const send = (p: Record<string, unknown>) =>
+    fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, Authorization: `Bearer ${key}` },
+      body: JSON.stringify(p),
+    });
+
+  let res = await send(payload);
+  if (!res.ok && res.status === 400 && body.json) {
+    // If this model rejects json_object, fall back to prompt-only JSON (instructions already ask for it).
+    const detail = await res.clone().text();
+    if (/format|json_object/i.test(detail)) {
+      const { text: _omit, ...withoutFormat } = payload;
+      res = await send(withoutFormat);
     }
   }
-
-  const payload: Record<string, unknown> = { model, messages };
-  if (body.maxTokens) payload.max_completion_tokens = body.maxTokens;
-  if (body.temperature !== undefined && !isReasoningModel(model)) payload.temperature = body.temperature;
-  if (body.json) payload.response_format = { type: 'json_object' };
-  if (body.tools?.length) payload.tools = body.tools;
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { ...JSON_HEADERS, Authorization: `Bearer ${key}` },
-    body: JSON.stringify(payload),
-  });
   if (!res.ok) await providerError(res, 'OpenAI');
   const data = await res.json();
-  const choice = data.choices?.[0]?.message ?? {};
+
+  if (data.status === 'incomplete' && !extractText(data)) {
+    throw new HttpError(502, `OpenAI returned an incomplete response (${data.incomplete_details?.reason || 'unknown reason'}).`);
+  }
+
+  // Return tool calls in Chat Completions shape so existing callers keep working.
+  const toolCalls = (data.output || [])
+    .filter((item: any) => item.type === 'function_call')
+    .map((item: any) => ({ id: item.call_id, type: 'function', function: { name: item.name, arguments: item.arguments } }));
+
+  const u = data.usage || {};
   return {
-    text: (choice.content as string) || '',
-    toolCalls: choice.tool_calls,
+    text: extractText(data),
+    toolCalls: toolCalls.length ? toolCalls : undefined,
     provider: 'openai',
     model: data.model || model,
-    usage: data.usage,
+    usage: {
+      prompt_tokens: u.input_tokens ?? 0,
+      completion_tokens: u.output_tokens ?? 0,
+      total_tokens: u.total_tokens ?? (u.input_tokens ?? 0) + (u.output_tokens ?? 0),
+    },
   };
 }
 

@@ -504,7 +504,7 @@ const AIAssistantChat: React.FC<AIAssistantChatProps> = ({ assistantId: propAssi
             <span>Available 24/7</span>
           </div>
           <div className="text-right">
-            Powered by GPT-4o
+            Powered by OpenAI
           </div>
         </div>
       </div>

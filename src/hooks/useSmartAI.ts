@@ -234,7 +234,7 @@ const enhancedAI = {
           taskTypes: ['categorization', 'basic_classification']
         },
         {
-          model: 'gpt-4o-mini',
+          model: 'gpt-6.2-sol',
           successRate: 0.96,
           avgTime: 820,
           avgCost: 0.0090,
@@ -279,7 +279,7 @@ class TaskOptimizationHelper {
         estimatedCost: 0.045
       },
       lead_qualification: {
-        recommendedModel: 'gpt-4o-mini',
+        recommendedModel: 'gpt-6.2-sol',
         recommendedProvider: 'OpenAI',
         reasoning: 'Superior reasoning capabilities for complex lead qualification judgments. Strong accuracy on nuanced decision-making tasks.',
         alternativeModels: ['gemini-2.5-flash'],
@@ -326,7 +326,7 @@ class TaskOptimizationHelper {
           taskTypes: ['categorization', 'basic_classification']
         },
         {
-          model: 'gpt-4o-mini',
+          model: 'gpt-6.2-sol',
           successRate: 0.96,
           avgTime: 820,
           avgCost: 0.0090,

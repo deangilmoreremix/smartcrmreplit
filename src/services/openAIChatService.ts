@@ -37,7 +37,7 @@ interface GenerateResponse {
 }
 
 class OpenAIService {
-  private defaultModel: string = 'gpt-4o-mini';
+  private defaultModel: string = 'gpt-6.2-sol';
 
   constructor() {}
 
@@ -93,7 +93,8 @@ class OpenAIService {
         messages: request.messages as any,
         temperature: request.temperature ?? 0.7,
         maxTokens: request.maxTokens ?? 1000,
-        ...(request.model ? { model: request.model } : {}),
+        // Leave the model to the server default (or the user's saved preference) unless a caller picked another one.
+        ...(request.model && request.model !== this.defaultModel ? { model: request.model } : {}),
         ...(request.functions
           ? { tools: request.functions.map((f: any) => ({ type: 'function', function: f })) }
           : {}),
@@ -201,11 +202,10 @@ class OpenAIService {
 
     // Default pricing if model not in database
     const pricing: Record<string, number> = {
-      'gpt-4o': 5.0,
-      'gpt-4o-mini': 0.15,
-      'gpt-3.5-turbo': 0.0015,
-      'gpt-4': 10.0,
-      'gpt-4-turbo': 10.0
+      'gpt-6.2-sol': 2.0,
+      'gpt-6.2-astra': 8.0,
+      'gpt-4o': 2.5,
+      'gpt-4o-mini': 0.15
     };
 
     const costPer1kTokens = pricing[model] || 0.0015;
@@ -250,7 +250,7 @@ class OpenAIService {
     try {
       const response = await this.generateContent({
         messages,
-        model: model || 'gpt-4o-mini',
+        model: model || 'gpt-6.2-sol',
         customerId,
         featureUsed: 'email-generation',
         temperature: 0.7
@@ -312,7 +312,7 @@ class OpenAIService {
     try {
       const response = await this.generateContent({
         messages,
-        model: model || 'gpt-4o-mini',
+        model: model || 'gpt-6.2-sol',
         customerId,
         featureUsed: 'deal-insights',
         temperature: 0.3
@@ -377,7 +377,7 @@ class OpenAIService {
     try {
       const response = await this.generateContent({
         messages,
-        model: model || 'gpt-4o-mini',
+        model: model || 'gpt-6.2-sol',
         customerId,
         featureUsed: 'pipeline-health',
         temperature: 0.3
@@ -464,7 +464,7 @@ class OpenAIService {
     try {
       const response = await this.generateContent({
         messages,
-        model: model || 'gpt-4o-mini',
+        model: model || 'gpt-6.2-sol',
         customerId,
         featureUsed: 'meeting-agenda',
         temperature: 0.7

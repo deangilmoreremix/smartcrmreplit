@@ -65,7 +65,7 @@ class TaskRouterService {
         { model: 'gemma-2-2b-it', score: 75, reasoning: 'Fast scoring for simple cases' }
       ],
       openaiModels: [
-        { model: 'gpt-4o-mini', score: 88, reasoning: 'Optimal cost-performance for contact scoring' },
+        { model: 'gpt-6.2-sol', score: 88, reasoning: 'Optimal cost-performance for contact scoring' },
         { model: 'gpt-4o', score: 95, reasoning: 'Highest accuracy for critical scoring decisions' },
         { model: 'gpt-3.5-turbo', score: 78, reasoning: 'Cost-effective for basic scoring' }
       ],
@@ -79,7 +79,7 @@ class TaskRouterService {
       ],
       openaiModels: [
         { model: 'gpt-4o', score: 95, reasoning: 'Superior reasoning for complex data enrichment' },
-        { model: 'gpt-4o-mini', score: 85, reasoning: 'Cost-effective enrichment with good quality' }
+        { model: 'gpt-6.2-sol', score: 85, reasoning: 'Cost-effective enrichment with good quality' }
       ],
       defaultRequirements: { accuracy: 'high', speed: 'medium', cost: 'medium', complexity: 'complex', volume: 'single' }
     },
@@ -91,7 +91,7 @@ class TaskRouterService {
         { model: 'gemma-2-9b-it', score: 85, reasoning: 'More nuanced categorization' }
       ],
       openaiModels: [
-        { model: 'gpt-4o-mini', score: 88, reasoning: 'Reliable categorization with consistency' },
+        { model: 'gpt-6.2-sol', score: 88, reasoning: 'Reliable categorization with consistency' },
         { model: 'gpt-3.5-turbo', score: 82, reasoning: 'Basic categorization at low cost' }
       ],
       defaultRequirements: { accuracy: 'medium', speed: 'fast', cost: 'free', complexity: 'simple', volume: 'batch' }
@@ -103,7 +103,7 @@ class TaskRouterService {
         { model: 'gemini-1.5-flash-8b', score: 90, reasoning: 'Ultra-fast tagging with good precision' }
       ],
       openaiModels: [
-        { model: 'gpt-4o-mini', score: 85, reasoning: 'Consistent tagging quality' },
+        { model: 'gpt-6.2-sol', score: 85, reasoning: 'Consistent tagging quality' },
         { model: 'gpt-3.5-turbo', score: 80, reasoning: 'Cost-effective basic tagging' }
       ],
       defaultRequirements: { accuracy: 'medium', speed: 'realtime', cost: 'free', complexity: 'simple', volume: 'bulk' }
@@ -115,7 +115,7 @@ class TaskRouterService {
       ],
       openaiModels: [
         { model: 'gpt-4o', score: 95, reasoning: 'Superior reasoning for complex relationship mapping' },
-        { model: 'gpt-4o-mini', score: 80, reasoning: 'Good relationship detection with efficiency' }
+        { model: 'gpt-6.2-sol', score: 80, reasoning: 'Good relationship detection with efficiency' }
       ],
       defaultRequirements: { accuracy: 'critical', speed: 'medium', cost: 'medium', complexity: 'expert', volume: 'single' }
     },
@@ -127,7 +127,7 @@ class TaskRouterService {
       ],
       openaiModels: [
         { model: 'gpt-4o', score: 95, reasoning: 'Best-in-class qualification accuracy' },
-        { model: 'gpt-4o-mini', score: 87, reasoning: 'Efficient qualification with good accuracy' }
+        { model: 'gpt-6.2-sol', score: 87, reasoning: 'Efficient qualification with good accuracy' }
       ],
       defaultRequirements: { accuracy: 'high', speed: 'fast', cost: 'low', complexity: 'medium', volume: 'batch' }
     },
@@ -138,7 +138,7 @@ class TaskRouterService {
         { model: 'gemini-1.5-flash', score: 88, reasoning: 'Fast sentiment analysis with accuracy' }
       ],
       openaiModels: [
-        { model: 'gpt-4o-mini', score: 90, reasoning: 'Nuanced sentiment detection' },
+        { model: 'gpt-6.2-sol', score: 90, reasoning: 'Nuanced sentiment detection' },
         { model: 'gpt-4o', score: 95, reasoning: 'Superior emotional intelligence' }
       ],
       defaultRequirements: { accuracy: 'high', speed: 'fast', cost: 'low', complexity: 'medium', volume: 'batch' }
@@ -419,7 +419,7 @@ class TaskRouterService {
       'gemini-2.0-flash-exp': 1200,
       'gemini-1.5-flash': 1500,
       'gemma-2-9b-it': 2000,
-      'gpt-4o-mini': 2200,
+      'gpt-6.2-sol': 2200,
       'gpt-3.5-turbo': 1800,
       'gemma-2-27b-it': 3500,
       'gemini-1.5-pro': 3000,
