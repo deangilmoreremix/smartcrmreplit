@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as edgeFunctionService from '../../services/edgeFunctionService';
+import { aiClient } from '../../services/aiClient';
 import FileUpload from '../shared/FileUpload';
 import AIToolContent from '../shared/AIToolContent';
 import { MessageSquare, Upload } from 'lucide-react';
@@ -30,29 +31,26 @@ const MeetingSummaryContent: React.FC = () => {
     }
   };
 
-  const handleFilesAdded = (newFiles: File[]) => {
+  const handleFilesAdded = async (newFiles: File[]) => {
     setFiles(newFiles);
+    const file = newFiles[0];
+    if (!file) return;
     setIsUploading(true);
-    
-    // For demo purposes, we'll just handle text files directly
-    // In a real implementation, we might use a transcription service for audio files
-    if (newFiles.length > 0) {
-      const file = newFiles[0];
-      
-      if (file.type === 'text/plain') {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const content = e.target?.result as string;
-          setTranscript(content || '');
-          setIsUploading(false);
-        };
-        reader.readAsText(file);
+    setError(null);
+    try {
+      if (file.type.startsWith('text/') || file.name.endsWith('.txt')) {
+        setTranscript(await file.text());
       } else {
-        setTimeout(() => {
-          setIsUploading(false);
-          setError('For this demo, only text files can be processed directly. In a production environment, audio and video files would be transcribed via a service like Whisper API.');
-        }, 1500);
+        // Audio/video: transcribe with OpenAI on the server.
+        if (file.size > 4 * 1024 * 1024) {
+          throw new Error('Audio/video files must be under 4 MB. Trim the recording or paste the transcript instead.');
+        }
+        setTranscript(await aiClient.transcribe(file, file.name));
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read the file');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -108,14 +106,14 @@ const MeetingSummaryContent: React.FC = () => {
               }}
             />
             <p className="text-xs text-gray-500 mt-1">
-              Supports text files. Audio/video transcription is simulated in this demo.
+              Text files are read directly; audio/video (under 4 MB) is transcribed with OpenAI.
             </p>
           </div>
 
           <div className="flex justify-between">
             <p className="text-sm text-gray-600">
               <Upload className="inline h-4 w-4 mr-1 text-gray-500" />
-              Max size: 25MB
+              Max size: 4MB for audio/video
             </p>
             <button
               type="submit"

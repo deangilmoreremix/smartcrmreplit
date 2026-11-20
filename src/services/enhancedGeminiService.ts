@@ -9,6 +9,8 @@ interface GenerateContentRequest {
   systemInstruction?: string;
   customerId?: string;
   featureUsed?: string;
+  /** Ask the model for a JSON object (OpenAI JSON mode). */
+  json?: boolean;
 }
 
 interface GenerateContentResponse {
@@ -92,11 +94,17 @@ class EnhancedGeminiService {
     // Requests go through the server-side AI gateway (/api/ai). The server picks the
     // provider/model (OpenAI primary, Gemini fallback); provider keys never reach the browser.
     try {
-      const result = await aiClient.chat(request.prompt, {
+      const chatOptions = {
         system: request.systemInstruction,
         temperature: request.temperature ?? 0.7,
         maxTokens: request.maxTokens,
-      });
+      };
+      const result = request.json
+        ? await (async () => {
+            const parsed = await aiClient.json(request.prompt, chatOptions);
+            return { text: JSON.stringify(parsed), model: 'openai', usage: undefined as unknown };
+          })()
+        : await aiClient.chat(request.prompt, chatOptions);
       const usage: any = result.usage || {};
       const response: GenerateContentResponse = {
         content: this.stripMarkdownCodeBlocks(result.text),
@@ -197,6 +205,7 @@ class EnhancedGeminiService {
         model,
         customerId,
         featureUsed: 'business_analysis',
+        json: true,
         systemInstruction: "You are a CRM analytics expert. Provide concise, actionable insights in valid JSON format only. Do not wrap the JSON in markdown code blocks."
       });
 
@@ -239,6 +248,7 @@ class EnhancedGeminiService {
         model,
         customerId,
         featureUsed: 'email-generation',
+        json: true,
         systemInstruction: "You are a professional email writing assistant. Write clear, engaging emails that drive action. Return only valid JSON without markdown formatting."
       });
 
@@ -450,6 +460,7 @@ Respond as JSON: {"riskScore": number 0-100, "riskLevel": "low"|"medium"|"high",
         maxTokens: 1200,
         customerId,
         featureUsed: 'churn_prediction',
+        json: true,
         systemInstruction: 'You are a customer success analyst. Return only valid JSON.'
       });
 
@@ -490,6 +501,7 @@ Respond as JSON: {"sentiment": "positive"|"negative"|"neutral", "score": number 
         maxTokens: 800,
         customerId,
         featureUsed: 'sentiment_analysis',
+        json: true,
         systemInstruction: 'You are a sentiment analysis engine. Return only valid JSON.'
       });
 

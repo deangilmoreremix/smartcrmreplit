@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useDealStore } from '../../store/dealStore';
 import { useContactStore } from '../../store/contactStore';
 import { useTheme } from '../../contexts/ThemeContext';
-import { TrendingUp, AlertTriangle, Clock, DollarSign, RefreshCw, Info } from 'lucide-react';
-import { geminiService } from '../../services/geminiService';
+import { TrendingUp, AlertTriangle, Clock, DollarSign, RefreshCw, Info, Sparkles } from 'lucide-react';
+import { aiContent, type PipelineHealth } from '../../services/aiContentService';
 import Avatar from '../ui/Avatar';
 import { getInitials } from '../../utils/avatars';
 
+import { isOpenDeal, stageName } from '../../utils/dealStage';
 interface DealInsight {
   icon: React.ElementType;
   title: string;
@@ -27,6 +28,8 @@ const LiveDealAnalysis: React.FC = () => {
   const [activeDealCount, setActiveDealCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiHealth, setAiHealth] = useState<PipelineHealth | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
     // Analyze pipeline on initial load and when deals change
@@ -39,9 +42,7 @@ const LiveDealAnalysis: React.FC = () => {
     
     try {
       // Process basic insights without requiring AI
-      const activeDeals = Object.values(deals).filter(deal => 
-        deal.stage !== 'closed-won' && deal.stage !== 'closed-lost'
-      );
+      const activeDeals = Object.values(deals).filter(isOpenDeal);
       
       setActiveDealCount(activeDeals.length);
       
@@ -123,51 +124,45 @@ const LiveDealAnalysis: React.FC = () => {
       
       setInsights(initialInsights);
       
-      // Now enhance with AI insights if we have enough deals
-      if (activeDeals.length >= 3) {
-        try {
-          // Prepare data for AI analysis
-          const dealData = {
-            deals: activeDeals.map(deal => ({
-              id: deal.id,
-              title: deal.title,
-              value: deal.value,
-              stage: deal.stage,
-              probability: deal.probability,
-              daysInStage: deal.daysInStage || 0,
-              priority: deal.priority,
-              contactId: deal.contactId
-            })),
-            summary: {
-              totalCount: activeDeals.length,
-              totalValue: activeDeals.reduce((sum, deal) => sum + deal.value, 0),
-              avgValue,
-              stageDistribution: {
-                qualification: activeDeals.filter(d => d.stage === 'qualification').length,
-                proposal: activeDeals.filter(d => d.stage === 'proposal').length,
-                negotiation: activeDeals.filter(d => d.stage === 'negotiation').length
-              }
-            }
-          };
-          
-          // Use AI for deal analysis
-          const analysisResult = await geminiService.generatePersonalizedMessage(dealData, 'email');
-          
-          if (analysisResult) {
-            // For now, keep the basic insights since the service doesn't have analyzeDeal method
-            console.log('Generated deal analysis insight:', analysisResult);
-          }
-        } catch (aiError) {
-          console.error("AI deal analysis error:", aiError);
-          // We keep the basic insights if AI fails
-          setError(aiError instanceof Error ? aiError.message : "Failed to analyze deals with AI");
-        }
-      }
     } catch (e) {
       console.error("Error in deal analysis:", e);
       setError("Failed to analyze deals");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const runAIAnalysis = async () => {
+    const activeDeals = Object.values(deals).filter(isOpenDeal) as any[];
+    if (!activeDeals.length) {
+      setError('Add some open deals to run an AI analysis.');
+      return;
+    }
+    setAiLoading(true);
+    setError(null);
+    try {
+      const health = await aiContent.analyzePipelineHealth({
+        deals: activeDeals.map(deal => ({
+          title: deal.title,
+          company: deal.company,
+          value: deal.value,
+          stage: stageName(deal),
+          probability: deal.probability,
+          daysInStage: deal.daysInStage || 0,
+          priority: deal.priority,
+          expectedCloseDate: deal.expectedCloseDate,
+        })),
+        summary: {
+          totalCount: activeDeals.length,
+          totalValue: activeDeals.reduce((sum, deal) => sum + (Number(deal.value) || 0), 0),
+          avgValue: averageDealValue,
+        },
+      });
+      setAiHealth(health);
+    } catch (aiError) {
+      setError(aiError instanceof Error ? aiError.message : 'Failed to analyze deals with AI');
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -219,9 +214,7 @@ const LiveDealAnalysis: React.FC = () => {
             <Info className={`h-4 w-4 mt-0.5 ${isDark ? 'text-yellow-400' : 'text-yellow-500'}`} />
             <div className="ml-2">
               <p className={`text-xs ${isDark ? 'text-yellow-300' : 'text-yellow-700'}`}>
-                {error.includes("API key") ? 
-                  "AI analysis requires API keys. Using basic analysis instead." : 
-                  "Using basic analysis mode. AI-powered insights unavailable."}
+                {error}
               </p>
             </div>
           </div>
@@ -266,6 +259,45 @@ const LiveDealAnalysis: React.FC = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className={`p-3 rounded-lg border ${isDark ? 'border-white/10 bg-white/5' : 'border-indigo-200 bg-indigo-50'}`}>
+        <div className="flex items-center justify-between">
+          <h3 className={`font-medium text-sm flex items-center ${isDark ? 'text-white' : 'text-indigo-900'}`}>
+            <Sparkles size={16} className="mr-2 text-indigo-500" /> AI Pipeline Analysis
+          </h3>
+          <button
+            onClick={runAIAnalysis}
+            disabled={aiLoading}
+            className="text-xs px-3 py-1 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center"
+          >
+            {aiLoading && <RefreshCw size={12} className="animate-spin mr-1" />}
+            {aiHealth ? 'Re-run' : 'Run AI analysis'}
+          </button>
+        </div>
+        {aiHealth && (
+          <div className={`mt-3 space-y-2 text-sm ${isDark ? 'text-gray-200' : 'text-gray-800'}`} data-testid="ai-pipeline-result">
+            <p>
+              <span className="font-semibold">Health score:</span> {aiHealth.healthScore}/100
+              {' · '}
+              <span className="font-semibold">Forecast confidence:</span> {aiHealth.forecastAccuracy}%
+            </p>
+            {([
+              ['Key insights', aiHealth.keyInsights],
+              ['Bottlenecks', aiHealth.bottlenecks],
+              ['Opportunities', aiHealth.opportunities],
+            ] as const).map(([label, items]) =>
+              items.length ? (
+                <div key={label}>
+                  <p className="font-semibold">{label}</p>
+                  <ul className="list-disc ml-5">
+                    {items.map((item, i) => <li key={i}>{item}</li>)}
+                  </ul>
+                </div>
+              ) : null
+            )}
+          </div>
+        )}
       </div>
 
       <div className={`p-3 rounded-lg border ${

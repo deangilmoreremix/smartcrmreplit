@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as edgeFunctionService from '../../services/edgeFunctionService';
+import { extractFilesText } from '../../services/fileContextService';
 import FileUpload from '../shared/FileUpload';
 import AIToolContent from '../shared/AIToolContent';
 import { FileSearch, PlusCircle, Trash, Link } from 'lucide-react';
@@ -16,6 +17,8 @@ const CompetitorAnalysisContent: React.FC = () => {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [fileContext, setFileContext] = useState('');
+  const [isReadingFiles, setIsReadingFiles] = useState(false);
 
   const addStrength = () => {
     setFormData({
@@ -62,7 +65,8 @@ const CompetitorAnalysisContent: React.FC = () => {
       const analysisResult = await edgeFunctionService.analyzeCompetitor(
         formData.competitorName,
         formData.industry,
-        strengths
+        strengths,
+        fileContext
       );
       setResult(analysisResult);
     } catch (err) {
@@ -73,15 +77,18 @@ const CompetitorAnalysisContent: React.FC = () => {
     }
   };
 
-  const handleFilesAdded = (newFiles: File[]) => {
+  const handleFilesAdded = async (newFiles: File[]) => {
     setFiles(newFiles);
-    
-    // In a real app, we would extract info from the file
-    // For demo purposes, just acknowledge
-    if (newFiles.length > 0) {
-      setTimeout(() => {
-        setError("Document analysis would be processed on the server in a production environment.");
-      }, 1000);
+    setFileContext('');
+    if (!newFiles.length) return;
+    setIsReadingFiles(true);
+    setError(null);
+    try {
+      setFileContext(await extractFilesText(newFiles));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read the uploaded files');
+    } finally {
+      setIsReadingFiles(false);
     }
   };
 
@@ -235,7 +242,11 @@ const CompetitorAnalysisContent: React.FC = () => {
               fileType="document"
               onFilesAdded={handleFilesAdded}
               maxFiles={2}
+              isUploading={isReadingFiles}
             />
+            {fileContext && (
+              <p className="text-xs text-green-700 mt-1">Uploaded material read and will be included in the analysis.</p>
+            )}
             <p className="text-xs text-gray-500 mt-1">
               Add competitor marketing materials, pricing sheets, or product documentation for enhanced analysis.
             </p>

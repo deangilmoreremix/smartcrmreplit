@@ -8,6 +8,7 @@ import { useContactStore } from '../hooks/useContactStore';
 import { useDealStore } from '../store/dealStore';
 import { useTaskStore } from '../store/taskStore';
 
+import { stageId, stageName } from '../utils/dealStage';
 export interface FunctionSchema {
   name: string;
   description: string;
@@ -89,7 +90,7 @@ function pickContact(c: any) {
   return { id: c.id, name: c.name, title: c.title || c.position, company: c.company, email: c.email, phone: c.phone, status: c.status, industry: c.industry };
 }
 function pickDeal(d: any) {
-  return { id: d.id, title: d.title || d.name, company: d.company, value: d.value, stage: d.stage, probability: d.probability, contact: d.contact || d.contactName, expectedCloseDate: d.expectedCloseDate || d.dueDate };
+  return { id: d.id, title: d.title || d.name, company: d.company, value: d.value, stage: stageName(d), probability: d.probability, contact: d.contact || d.contactName, expectedCloseDate: d.expectedCloseDate || d.dueDate };
 }
 
 function addTask(task: { title: string; description?: string; type: string; priority?: string; dueDate?: string; contactId?: string; dealId?: string }) {
@@ -129,8 +130,8 @@ export function executeFunction(name: string, args: any): unknown {
     case 'searchDeals': {
       const q = text(args.query);
       return deals()
-        .filter((d) => !q || [d.title, d.name, d.company, d.stage].some((f) => text(f).includes(q)))
-        .filter((d) => !args.stage || text(d.stage).includes(text(args.stage)))
+        .filter((d) => !q || [d.title, d.name, d.company, stageName(d)].some((f) => text(f).includes(q)))
+        .filter((d) => !args.stage || text(stageName(d)).includes(text(args.stage)) || text(stageId(d)).includes(text(args.stage)))
         .filter((d) => !args.minValue || Number(d.value) >= args.minValue)
         .slice(0, 10)
         .map(pickDeal);

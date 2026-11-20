@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import * as edgeFunctionService from '../../services/edgeFunctionService';
+import { extractFilesText } from '../../services/fileContextService';
 import AIToolContent from '../shared/AIToolContent';
 import FileUpload from '../shared/FileUpload';
 import { TrendingUp, ChevronRight } from 'lucide-react';
@@ -16,6 +17,8 @@ const MarketTrendContent: React.FC = () => {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [fileContext, setFileContext] = useState('');
+  const [isReadingFiles, setIsReadingFiles] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -36,7 +39,8 @@ const MarketTrendContent: React.FC = () => {
       const analysisResult = await edgeFunctionService.analyzeMarketTrends(
         formData.industry,
         formData.targetMarket,
-        formData.timeframe
+        formData.timeframe,
+        [formData.additionalContext, fileContext].filter(Boolean).join('\n\n')
       );
       setResult(analysisResult);
     } catch (err) {
@@ -47,17 +51,18 @@ const MarketTrendContent: React.FC = () => {
     }
   };
 
-  const handleFilesAdded = (newFiles: File[]) => {
+  const handleFilesAdded = async (newFiles: File[]) => {
     setFiles(newFiles);
-    
-    // In a real app, we would extract market data from the files
-    if (newFiles.length > 0) {
-      setTimeout(() => {
-        setFormData({
-          ...formData,
-          additionalContext: formData.additionalContext + "\n\nData from uploaded files would be processed here."
-        });
-      }, 1000);
+    setFileContext('');
+    if (!newFiles.length) return;
+    setIsReadingFiles(true);
+    setError(null);
+    try {
+      setFileContext(await extractFilesText(newFiles));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read the uploaded files');
+    } finally {
+      setIsReadingFiles(false);
     }
   };
 
@@ -217,7 +222,11 @@ const MarketTrendContent: React.FC = () => {
                 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
                 'text/csv': ['.csv']
               }}
+              isUploading={isReadingFiles}
             />
+            {fileContext && (
+              <p className="text-xs text-green-700 mt-1">Uploaded reports read and will be included in the analysis.</p>
+            )}
             <p className="text-xs text-gray-500 mt-1">
               Upload relevant market reports or data sheets to enhance your analysis.
             </p>

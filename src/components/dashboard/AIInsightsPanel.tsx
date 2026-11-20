@@ -4,10 +4,11 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAITools } from '../../components/AIToolsProvider';
 import { useDealStore } from '../../store/dealStore';
 import { useContactStore } from '../../store/contactStore';
-import { geminiService } from '../../services/geminiService';
+import { aiContent } from '../../services/aiContentService';
 import Avatar from '../ui/Avatar';
 import { getInitials } from '../../utils/avatars';
 
+import { isOpenDeal, stageName } from '../../utils/dealStage';
 interface Insight {
   type: 'success' | 'warning' | 'insight';
   title: string;
@@ -31,9 +32,7 @@ const AIInsightsPanel = () => {
   // Create initial insights with the three required categories
   const createDefaultInsights = (): Insight[] => {
     // Get contacts for the insights
-    const activeDeals = Object.values(deals).filter(deal => 
-      deal.stage !== 'closed-won' && deal.stage !== 'closed-lost'
-    );
+    const activeDeals = Object.values(deals).filter(isOpenDeal);
 
     // High value deals
     const highValueDeals = activeDeals.filter(deal => deal.value > 50000);
@@ -71,8 +70,8 @@ const AIInsightsPanel = () => {
     return [
       {
         type: 'success',
-        title: 'Pipeline Health Strong',
-        description: 'Your pipeline velocity has increased 23% this month with high-quality leads entering the qualification stage.',
+        title: 'High-Value Deals',
+        description: `${highValueDeals.length} open deals over $50k, worth $${highValueDeals.reduce((sum, d) => sum + d.value, 0).toLocaleString()} in total.`,
         icon: CheckCircle,
         color: isDark ? 'text-green-400' : 'text-green-600',
         bgColor: isDark ? 'bg-green-500/20' : 'bg-green-100',
@@ -80,8 +79,8 @@ const AIInsightsPanel = () => {
       },
       {
         type: 'warning',
-        title: 'Deal Risk Alert',
-        description: `${stalledDeals.length} high-value deals show stagnation in negotiation stage. Consider immediate follow-up actions.`,
+        title: 'Stalled Deals',
+        description: `${stalledDeals.length} open deals have been in the same stage for more than 10 days.`,
         icon: AlertTriangle,
         color: isDark ? 'text-orange-400' : 'text-orange-600',
         bgColor: isDark ? 'bg-orange-500/20' : 'bg-orange-100',
@@ -89,8 +88,8 @@ const AIInsightsPanel = () => {
       },
       {
         type: 'insight',
-        title: 'Conversion Opportunity',
-        description: `AI identified ${highProbDeals.length} prospects with 85%+ closing probability. Prioritize these for immediate attention.`,
+        title: 'Likely to Close',
+        description: `${highProbDeals.length} open deals have a win probability above 70%.`,
         icon: TrendingUp,
         color: isDark ? 'text-blue-400' : 'text-blue-600',
         bgColor: isDark ? 'bg-blue-500/20' : 'bg-blue-100',
@@ -101,35 +100,11 @@ const AIInsightsPanel = () => {
   
   const [insights, setInsights] = useState<Insight[]>(createDefaultInsights());
 
-  useEffect(() => {
-    // Generate initial insights when component mounts
-    generateInitialInsights();
-  }, []);
 
   // When theme changes, regenerate default insights to update colors
   useEffect(() => {
     setInsights(createDefaultInsights());
   }, [isDark]);
-
-  const generateInitialInsights = async () => {
-    // Only generate if we have enough data
-    if (Object.keys(deals).length < 2 || Object.keys(contacts).length < 2) {
-      return;
-    }
-    
-    if (!geminiService.isApiKeyConfigured()) {
-      setApiKeysConfigured(false);
-      return;
-    }
-
-    try {
-      await generateRealInsights();
-    } catch (error) {
-      console.error("Failed to generate initial insights:", error);
-      setApiKeysConfigured(false);
-      // Don't set error state for initial load failures
-    }
-  };
 
   const generateInsights = async () => {
     setIsGenerating(true);
@@ -139,9 +114,7 @@ const AIInsightsPanel = () => {
       await generateRealInsights();
     } catch (error) {
       console.error("Failed to generate insights:", error);
-      // Set a more user-friendly error message
-      setError("Unable to generate AI insights at this time. Please try again later.");
-      setApiKeysConfigured(false);
+      setError(error instanceof Error ? error.message : "Unable to generate AI insights at this time.");
     } finally {
       setIsGenerating(false);
     }
@@ -179,68 +152,52 @@ const AIInsightsPanel = () => {
   };
 
   const generateRealInsights = async () => {
-    if (!geminiService.isApiKeyConfigured()) {
-      setError("Gemini API key is not configured. Please add VITE_GOOGLE_AI_API_KEY to your environment.");
-      setApiKeysConfigured(false);
-      return;
-    }
-    
-    // Convert to arrays for analysis
     const dealsArray = Object.values(deals);
     const contactsArray = Object.values(contacts);
-    
-    // Prepare pipeline data for analysis
-    const pipelineData = {
-      deals: dealsArray.map(deal => ({
-        id: deal.id,
+    const openDeals = dealsArray.filter(isOpenDeal);
+
+    const health = await aiContent.analyzePipelineHealth({
+      deals: openDeals.map(deal => ({
         title: deal.title,
         value: deal.value,
-        stage: deal.stage,
+        stage: stageName(deal),
         probability: deal.probability,
         daysInStage: deal.daysInStage,
         priority: deal.priority,
-        contactId: deal.contactId
       })),
-      contacts: contactsArray.map(contact => ({
-        id: contact.id,
+      contacts: contactsArray.slice(0, 100).map(contact => ({
         name: contact.name,
         company: contact.company,
         status: contact.status,
         source: contact.source,
-        tags: contact.tags
       })),
       summary: {
-        activeDealCount: dealsArray.filter(d => d.stage !== 'closed-won' && d.stage !== 'closed-lost').length,
-        totalPipelineValue: dealsArray.filter(d => d.stage !== 'closed-won' && d.stage !== 'closed-lost')
-          .reduce((sum, deal) => sum + deal.value, 0),
-        avgDealSize: dealsArray.length > 0 ? 
-          dealsArray.reduce((sum, deal) => sum + deal.value, 0) / dealsArray.length : 0,
-        hotLeadsCount: contactsArray.filter(c => c.status === 'hot').length
-      }
-    };
-    
-    try {
-      // Use geminiService to analyze pipeline health
-      const response = await geminiService.generatePersonalizedMessage(pipelineData, 'email');
-      
-      // Reset API keys configured flag if we got a successful result
-      setApiKeysConfigured(true);
+        activeDealCount: openDeals.length,
+        totalPipelineValue: openDeals.reduce((sum, deal) => sum + deal.value, 0),
+        avgDealSize: openDeals.length ? openDeals.reduce((sum, deal) => sum + deal.value, 0) / openDeals.length : 0,
+        hotLeadsCount: contactsArray.filter(c => c.status === 'hot').length,
+      },
+    });
 
-      // Get default insights
-      const defaultInsights = createDefaultInsights();
-      
-      // For now, keep the default insights since the service doesn't have pipeline analysis
-      if (response) {
-        console.log('Generated pipeline analysis:', response);
-        setInsights(defaultInsights);
-      }
-      
-    } catch (error) {
-      console.error("Error generating insights:", error);
-      // Set a more user-friendly error message
-      setError("Unable to generate AI insights at this time. Please try again later.");
-      setApiKeysConfigured(false);
-    }
+    setApiKeysConfigured(true);
+    const base = createDefaultInsights();
+    setInsights([
+      {
+        ...base[0],
+        title: `Pipeline Health: ${health.healthScore}/100`,
+        description: health.keyInsights[0] || base[0].description,
+      },
+      {
+        ...base[1],
+        title: 'Bottleneck',
+        description: health.bottlenecks[0] || base[1].description,
+      },
+      {
+        ...base[2],
+        title: 'Opportunity',
+        description: health.opportunities[0] || base[2].description,
+      },
+    ]);
   };
 
   return (

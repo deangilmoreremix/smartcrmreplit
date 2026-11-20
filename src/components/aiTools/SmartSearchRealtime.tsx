@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, User, Building, DollarSign, Loader2 } from 'lucide-react';
 import { useContactStore } from '../../store/contactStore';
 import { useDealStore } from '../../store/dealStore';
-import { geminiService } from '../../services/geminiService';
+import { openaiEmbeddingsService } from '../../services/openaiEmbeddingsService';
 import { useTheme } from '../../contexts/ThemeContext';
 
+import { stageName } from '../../utils/dealStage';
 interface SearchResult {
   type: 'contact' | 'deal' | 'company';
   id: string;
@@ -68,7 +69,7 @@ const SmartSearchRealtime: React.FC = () => {
             type: 'deal' as const,
             id: deal.id,
             title: deal.title,
-            subtitle: `Stage: ${deal.stage}`,
+            subtitle: `Stage: ${stageName(deal)}`,
             icon: DollarSign,
             value: `$${deal.value.toLocaleString()}`
           })),
@@ -97,42 +98,45 @@ const SmartSearchRealtime: React.FC = () => {
         // Use limited basic results first for quick response
         setResults(basicResults.slice(0, 5));
         
-        // Now enhance results with AI if we have enough data
-        if (searchQuery.length >= 3 && (filteredContacts.length >= 2 || filteredDeals.length >= 2)) {
+        // Semantic (embedding) search finds matches the keyword filter misses,
+        // e.g. "warm leads in healthcare" or "big deals about to close".
+        setEnhancedResults(false);
+        if (searchQuery.trim().length >= 4) {
           try {
-            // Prepare data for AI analysis
-            const searchContext = {
-              query: searchQuery,
-              contacts: filteredContacts.map(c => ({
+            const allContacts = Object.values(contacts) as any[];
+            const allDeals = Object.values(deals) as any[];
+            const [contactHits, dealHits] = await Promise.all([
+              openaiEmbeddingsService.searchContacts(searchQuery, allContacts, 5),
+              openaiEmbeddingsService.searchDeals(searchQuery, allDeals, 5),
+            ]);
+            const seen = new Set(basicResults.map(r => `${r.type}:${r.id}`));
+            const semantic: SearchResult[] = [
+              ...contactHits.filter(h => h.score > 0.3).map(({ item: c, score }) => ({
+                type: 'contact' as const,
                 id: c.id,
-                name: c.name,
-                company: c.company,
-                email: c.email,
-                status: c.interestLevel || c.status,
-                tags: c.tags
+                title: c.name,
+                subtitle: [c.title || c.position, c.company].filter(Boolean).join(' at '),
+                icon: User,
+                value: 'Contact',
+                matchReason: `Semantic match (${Math.round(score * 100)}%)`,
               })),
-              deals: filteredDeals.map(d => ({
+              ...dealHits.filter(h => h.score > 0.3).map(({ item: d, score }) => ({
+                type: 'deal' as const,
                 id: d.id,
                 title: d.title,
-                value: d.value,
-                stage: d.stage,
-                probability: d.probability,
-                contactId: d.contactId
+                subtitle: `Stage: ${stageName(d)}`,
+                icon: DollarSign,
+                value: `$${Number(d.value || 0).toLocaleString()}`,
+                matchReason: `Semantic match (${Math.round(score * 100)}%)`,
               })),
-              companies: uniqueCompanies
-            };
-            
-            // Generate enhanced search results with AI
-            const response = await geminiService.generatePersonalizedMessage(searchContext, 'email');
-            
-            // For now, keep basic results since the AI service doesn't have search functionality
-            if (response) {
-              console.log('AI search enhancement generated:', response);
+            ].filter(r => !seen.has(`${r.type}:${r.id}`));
+            if (semantic.length) {
+              setResults([...basicResults.slice(0, 5), ...semantic].slice(0, 10));
               setEnhancedResults(true);
             }
           } catch (aiError) {
-            console.error("AI search enhancement failed:", aiError);
-            // Keep basic results if AI fails
+            console.error('Semantic search failed:', aiError);
+            // Keyword results stay on screen.
           }
         }
       } catch (error) {
@@ -150,7 +154,7 @@ const SmartSearchRealtime: React.FC = () => {
       if (query) {
         debouncedSearch(query);
       }
-    }, 300);
+    }, 600);
 
     return () => clearTimeout(timer);
   }, [query, debouncedSearch]);

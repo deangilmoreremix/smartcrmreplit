@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
-import { enhancedGeminiService } from '../../services/enhancedGeminiService';
+import { aiClient } from '../../services/aiClient';
+import { useContactStore } from '../../hooks/useContactStore';
+import { useDealStore } from '../../store/dealStore';
 import { aiUsageTracker } from '../../services/aiUsageTracker';
 import { AlertTriangle, Download, Search, TrendingDown, Users, Target, Mail, Phone } from 'lucide-react';
 
+import { stageId, isOpenDeal, isClosedDeal } from '../../utils/dealStage';
 interface ChurnPredictionFormData {
   timeframe: string;
   includeContactData: boolean;
@@ -51,6 +54,9 @@ export default function ChurnPrediction() {
   });
   const [prediction, setPrediction] = useState<ChurnPredictionResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const contacts = useContactStore(state => state.contacts);
+  const deals = useDealStore(state => state.deals);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -58,25 +64,45 @@ export default function ChurnPrediction() {
 
   const generatePrediction = async () => {
     setIsLoading(true);
+    setError(null);
     const startTime = Date.now();
 
     try {
-      const result = await enhancedGeminiService.predictChurnRisk({
-        customerId: 'demo-customer-id',
-        engagementData: {
-          lastContact: new Date(Date.now() - parseInt(formData.timeframe) * 24 * 60 * 60 * 1000),
-          emailOpens: 15,
-          websiteVisits: 8,
-          supportTickets: 2,
-          purchaseHistory: []
-        },
-        customerProfile: {
-          includeContactData: formData.includeContactData,
-          includeDealHistory: formData.includeDealHistory,
-          includeEngagementMetrics: formData.includeEngagementMetrics,
-          riskThreshold: formData.riskThreshold
-        }
+      // Build the input from the CRM's real contacts and deals.
+      const now = Date.now();
+      const dealList = Object.values(deals as any) as any[];
+      const customers = (Object.values(contacts) as any[]).slice(0, 150).map(c => {
+        const theirDeals = dealList.filter(d => d.contactId === c.id);
+        const last = c.lastContact || c.updatedAt;
+        return {
+          name: c.name,
+          company: c.company,
+          status: c.status || c.interestLevel,
+          ...(formData.includeContactData ? { title: c.title || c.position, industry: c.industry, source: c.source } : {}),
+          ...(formData.includeEngagementMetrics
+            ? { daysSinceLastContact: last ? Math.floor((now - new Date(last).getTime()) / 86400000) : null, aiScore: c.aiScore }
+            : {}),
+          ...(formData.includeDealHistory
+            ? {
+                openDeals: theirDeals.filter(isOpenDeal).length,
+                wonDeals: theirDeals.filter(d => stageId(d) === 'closed-won').length,
+                lostDeals: theirDeals.filter(d => stageId(d) === 'closed-lost').length,
+                openValue: theirDeals.reduce((sum, d) => sum + (isClosedDeal(d) ? 0 : Number(d.value) || 0), 0),
+              }
+            : {}),
+        };
       });
+      if (!customers.length) throw new Error('There are no contacts to analyze yet.');
+
+      const result = await aiClient.json<ChurnPredictionResult>(
+        `Predict churn risk over the next ${formData.timeframe} days for these CRM customers. Flag customers at or above "${formData.riskThreshold}" risk. Base everything on the data; null means unknown.
+
+Customers:
+${JSON.stringify(customers)}
+
+Return JSON: {"summary":"2-3 sentences","metrics":{"highRisk":n,"mediumRisk":n,"lowRisk":n,"totalCustomers":n},"highRiskCustomers":[{"name":"","company":"","churnProbability":0-100,"riskLevel":"high|medium|low","lastContact":"e.g. 45 days ago","dealValue":"$...","engagementScore":"low|medium|high","riskFactors":["..."]}],"riskFactors":["portfolio-level factor"],"recommendations":["..."],"retentionStrategies":["..."]}`,
+        { system: 'You are a customer success analyst. Return only valid JSON.', temperature: 0.2 }
+      );
 
       setPrediction(result);
 
@@ -90,7 +116,7 @@ export default function ChurnPrediction() {
       });
     } catch (error) {
       console.error('Error generating churn prediction:', error);
-      alert('Failed to generate churn prediction. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to generate churn prediction. Please try again.');
       
       aiUsageTracker.trackUsage({
         toolId: 'churn-prediction',
@@ -319,6 +345,10 @@ ${prediction.retentionStrategies?.map((strategy: string, index: number) => `${in
           </motion.button>
         </motion.div>
       </motion.div>
+
+      {error && (
+        <div className="p-4 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">{error}</div>
+      )}
 
       {/* Prediction Results */}
       <AnimatePresence mode="wait">

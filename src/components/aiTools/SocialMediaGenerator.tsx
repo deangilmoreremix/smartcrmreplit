@@ -63,11 +63,16 @@ export default function SocialMediaGenerator() {
           keywords: keywords.length > 0 ? keywords : undefined,
           callToAction: formData.callToAction || undefined
         });
+        // Readability: Flesch reading ease computed from the text itself (no invented numbers).
+        const words = variation.split(/\s+/).filter(Boolean);
+        const sentences = Math.max(1, variation.split(/[.!?]+/).filter(t => t.trim()).length);
+        const syllables = words.reduce((n, w) => n + Math.max(1, (w.toLowerCase().match(/[aeiouy]+/g) || []).length), 0);
+        const flesch = 206.835 - 1.015 * (words.length / sentences) - 84.6 * (syllables / Math.max(1, words.length));
         variations.push({
           content: variation,
           id: i + 1,
-          engagement: Math.floor(Math.random() * 100) + 50, // Mock engagement score
-          readability: Math.floor(Math.random() * 20) + 80,  // Mock readability score
+          engagement: null,
+          readability: Math.max(0, Math.min(100, Math.round(flesch))),
         });
       }
 
@@ -124,7 +129,6 @@ CALL TO ACTION:
 ${post.callToAction || 'No call to action'}
 
 PERFORMANCE METRICS:
-Engagement Score: ${post.engagement}/100
 Readability Score: ${post.readability}/100
     `.trim();
 
@@ -353,8 +357,8 @@ Readability Score: ${post.readability}/100
               {/* Performance Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-green-600">{post.engagement}/100</div>
-                  <div className="text-xs text-gray-500">Engagement</div>
+                  <div className="text-lg font-bold text-green-600">{post.content?.split(/\s+/).filter(Boolean).length || 0}</div>
+                  <div className="text-xs text-gray-500">Words</div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-blue-600">{post.readability}/100</div>

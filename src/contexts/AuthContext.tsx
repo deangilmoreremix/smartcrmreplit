@@ -65,15 +65,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     getInitialSession();
 
     // Listen for auth changes
+    // Don't await Supabase calls inside this callback: supabase-js holds its auth lock
+    // while the callback runs, so awaiting a query here deadlocks (stuck on "Authenticating...").
+    // Defer the profile load to after the callback returns.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log('🔐 AuthProvider: Auth state changed:', event, session?.user ? 'user present' : 'no user');
         if (session?.user) {
-          await loadUserProfile(session.user.id);
+          const userId = session.user.id;
+          setTimeout(() => {
+            loadUserProfile(userId).finally(() => setIsLoading(false));
+          }, 0);
         } else {
           setUser(null);
+          setIsLoading(false);
         }
-        setIsLoading(false);
       }
     );
 

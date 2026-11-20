@@ -511,7 +511,7 @@ function App() {
                                 element={
                                   <ProtectedRoute>
                                     <ProtectedLayout>
-                                      <PlaceholderPage title="Image Generator" />
+                                      <Navigate to="/ai-tools?tool=image-generator" replace />
                                     </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
@@ -531,7 +531,7 @@ function App() {
                                 element={
                                   <ProtectedRoute>
                                     <ProtectedLayout>
-                                      <PlaceholderPage title="AI Model Demo" />
+                                      <Navigate to="/ai-tools?tool=ai-assistant-chat" replace />
                                     </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
@@ -591,7 +591,7 @@ function App() {
                                 element={
                                   <ProtectedRoute>
                                     <ProtectedLayout>
-                                      <PlaceholderPage title="AI Tools Features" />
+                                      <Navigate to="/ai-tools" replace />
                                     </ProtectedLayout>
                                   </ProtectedRoute>
                                 }
