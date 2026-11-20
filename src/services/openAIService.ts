@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { aiClient } from './aiClient';
 import { supabaseAIService } from './supabaseAIService';
 
 interface ChatMessage {
@@ -36,25 +37,16 @@ interface GenerateResponse {
 }
 
 class OpenAIService {
-  private apiKey: string;
-  private baseUrl: string = 'https://api.openai.com/v1';
   private defaultModel: string = 'gpt-4o-mini';
 
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey || import.meta.env.VITE_OPENAI_API_KEY || '';
-  }
+  constructor() {}
 
   /**
    * Check if API key is valid (not a placeholder)
    */
   private isValidApiKey(): boolean {
-    return this.apiKey && 
-           this.apiKey.length > 10 && 
-           !this.apiKey.includes('your_openai_api_key') &&
-           !this.apiKey.includes('your_ope') &&
-           !this.apiKey.includes('placeholder') &&
-           !this.apiKey.startsWith('your_') &&
-           this.apiKey !== 'your_openai_api_key';
+    // The OpenAI key lives server-side in the AI gateway; missing keys surface as request errors.
+    return true;
   }
 
   /**
@@ -96,28 +88,27 @@ class OpenAIService {
     const model = request.model || this.defaultModel;
     
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
-        },
-        body: JSON.stringify({
-          model,
-          messages: request.messages,
-          temperature: request.temperature ?? 0.7,
-          max_tokens: request.maxTokens ?? 1000,
-          ...(request.functions ? { functions: request.functions } : {}),
-          ...(request.functionCall ? { function_call: request.functionCall } : {})
-        })
+      // Routed through the server-side AI gateway (/api/ai) so the OpenAI key stays on the server.
+      const res = await aiClient.chat('', {
+        messages: request.messages as any,
+        temperature: request.temperature ?? 0.7,
+        maxTokens: request.maxTokens ?? 1000,
+        ...(request.model ? { model: request.model } : {}),
+        ...(request.functions
+          ? { tools: request.functions.map((f: any) => ({ type: 'function', function: f })) }
+          : {}),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
+      const toolCall = res.toolCalls?.[0];
+      const data: any = {
+        model: res.model,
+        usage: res.usage,
+        choices: [
+          {
+            message: toolCall ? { function_call: toolCall.function } : { content: res.text },
+            finish_reason: toolCall ? 'function_call' : 'stop',
+          },
+        ],
+      };
       const responseTime = Date.now() - startTime;
       
       // Extract function calls if any

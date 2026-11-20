@@ -1,4 +1,5 @@
 import { supabaseAIService, type AIModelConfig } from './supabaseAIService';
+import { aiClient, parseJSONResponse } from './aiClient';
 
 interface GenerateContentRequest {
   prompt: string;
@@ -23,25 +24,10 @@ interface GenerateContentResponse {
 }
 
 class EnhancedGeminiService {
-  private apiKey: string;
-  private baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta';
   private availableModels: AIModelConfig[] = [];
 
-  constructor(apiKey?: string) {
-    this.apiKey = apiKey || import.meta.env.VITE_GOOGLE_AI_API_KEY || '';
+  constructor() {
     this.loadAvailableModels();
-  }
-
-  /**
-   * Check if API key is valid (not a placeholder)
-   */
-  private isValidApiKey(): boolean {
-    return this.apiKey && 
-           this.apiKey.length > 10 && 
-           !this.apiKey.includes('your_google_ai_api_key') &&
-           !this.apiKey.includes('placeholder') &&
-           !this.apiKey.startsWith('your_') &&
-           this.apiKey !== 'your_google_ai_api_key';
   }
 
   /**
@@ -103,144 +89,64 @@ class EnhancedGeminiService {
    */
   async generateContent(request: GenerateContentRequest): Promise<GenerateContentResponse> {
     const startTime = Date.now();
-    
-    if (!this.isValidApiKey()) {
-      throw new Error('Google AI API key is required and must be properly configured. Please check your environment variables.');
-    }
-
-    // Get model configuration from database or fallback
-    const modelId = request.model || 'gemini-2.5-flash';
-    let modelConfig: AIModelConfig | null = null;
-    
+    // Requests go through the server-side AI gateway (/api/ai). The server picks the
+    // provider/model (OpenAI primary, Gemini fallback); provider keys never reach the browser.
     try {
-      modelConfig = await supabaseAIService.getModelById(modelId);
-    } catch (error) {
-      console.warn(`Could not fetch model configuration for ${modelId} from database:`, error);
-    }
-    
-    if (!modelConfig) {
-      // Use fallback configuration
-      modelConfig = supabaseAIService.getFallbackModel(modelId);
-      if (!modelConfig) {
-        // If still no model config, try with a default working model
-        console.warn(`Model ${modelId} not found, trying with default gemini-2.5-flash`);
-        modelConfig = supabaseAIService.getFallbackModel('gemini-2.5-flash');
-        if (!modelConfig) {
-          throw new Error(`Model ${modelId} not found in configuration and no fallback available`);
-        }
-      }
-      console.info(`Using fallback configuration for model ${modelId}`);
-    }
-
-    const url = `${this.baseUrl}/models/${modelConfig.model_name}:generateContent`;
-    
-    const requestBody = {
-      contents: [{
-        parts: [{
-          text: request.prompt
-        }]
-      }],
-      generationConfig: {
-        temperature: request.temperature || 0.7,
-        maxOutputTokens: request.maxTokens || modelConfig.max_tokens || 4096,
-        topP: 0.8,
-        topK: 10
-      }
-    };
-
-    // Add system instruction if provided and supported
-    if (request.systemInstruction && modelConfig.capabilities && 
-        modelConfig.capabilities.includes('system-instructions')) {
-      requestBody.systemInstruction = {
-        parts: [{
-          text: request.systemInstruction
-        }]
-      };
-    }
-
-    try {
-      const response = await fetch(`${url}?key=${this.apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
+      const result = await aiClient.chat(request.prompt, {
+        system: request.systemInstruction,
+        temperature: request.temperature ?? 0.7,
+        maxTokens: request.maxTokens,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(`Google AI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
-      }
-
-      const data = await response.json();
-      
-      if (!data.candidates || data.candidates.length === 0) {
-        throw new Error('No content generated');
-      }
-
-      const candidate = data.candidates[0];
-      let content = candidate.content?.parts?.[0]?.text || '';
-      const responseTime = Date.now() - startTime;
-      
-      // Always strip markdown code blocks from the content before returning
-      content = this.stripMarkdownCodeBlocks(content);
-      
-      const result: GenerateContentResponse = {
-        content,
-        model: modelId,
+      const usage: any = result.usage || {};
+      const response: GenerateContentResponse = {
+        content: this.stripMarkdownCodeBlocks(result.text),
+        model: result.model,
         usage: {
-          promptTokens: data.usageMetadata?.promptTokenCount || 0,
-          completionTokens: data.usageMetadata?.candidatesTokenCount || 0,
-          totalTokens: data.usageMetadata?.totalTokenCount || 0
+          promptTokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
+          completionTokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
+          totalTokens: usage.total_tokens ?? usage.totalTokenCount ?? 0,
         },
-        finishReason: candidate.finishReason || 'completed',
-        responseTime
+        finishReason: 'completed',
+        responseTime: Date.now() - startTime,
       };
-
-      // Log usage to Supabase (gracefully handle failures)
-      const validCustomerId = this.validateCustomerId(request.customerId);
-      if (validCustomerId) {
-        const cost = this.calculateCost(modelConfig, result.usage.totalTokens);
-        
-        try {
-          await supabaseAIService.logUsage({
-            customer_id: validCustomerId,
-            model_id: modelId,
-            feature_used: request.featureUsed || 'text-generation',
-            tokens_used: result.usage.totalTokens,
-            cost,
-            response_time_ms: responseTime,
-            success: true
-          });
-        } catch (logError) {
-          console.warn('Failed to log AI usage (non-critical):', logError);
-        }
-      }
-
-      return result;
+      void this.logUsage(request, response.model, response.usage.totalTokens, Date.now() - startTime, true);
+      return response;
     } catch (error) {
-      // Log failed usage (gracefully handle failures)
-      const validCustomerId = this.validateCustomerId(request.customerId);
-      if (validCustomerId) {
-        try {
-          await supabaseAIService.logUsage({
-            customer_id: validCustomerId,
-            model_id: modelId,
-            feature_used: request.featureUsed || 'text-generation',
-            tokens_used: 0,
-            cost: 0,
-            response_time_ms: Date.now() - startTime,
-            success: false,
-            error_message: error instanceof Error ? error.message : 'Unknown error'
-          });
-        } catch (logError) {
-          console.warn('Failed to log AI error usage (non-critical):', logError);
-        }
-      }
-
-      console.error('Gemini API error:', error);
+      void this.logUsage(request, request.model || 'unknown', 0, Date.now() - startTime, false, error);
+      console.error('AI generation error:', error);
       throw error;
     }
+  }
+
+  private async logUsage(
+    request: GenerateContentRequest,
+    modelId: string,
+    tokens: number,
+    responseTime: number,
+    success: boolean,
+    error?: unknown,
+  ) {
+    const validCustomerId = this.validateCustomerId(request.customerId);
+    if (!validCustomerId) return;
+    try {
+      await supabaseAIService.logUsage({
+        customer_id: validCustomerId,
+        model_id: modelId,
+        feature_used: request.featureUsed || 'text-generation',
+        tokens_used: tokens,
+        cost: 0,
+        response_time_ms: responseTime,
+        success,
+        ...(error ? { error_message: error instanceof Error ? error.message : String(error) } : {}),
+      });
+    } catch (logError) {
+      console.warn('Failed to log AI usage (non-critical):', logError);
+    }
+  }
+
+  /** Parse a JSON reply from the model. */
+  private parseJSON(content: string): any {
+    return parseJSONResponse(content);
   }
 
   /**
@@ -284,45 +190,20 @@ class EnhancedGeminiService {
     }
     `;
 
-    if (!this.isValidApiKey()) {
-      return {
-        healthScore: 75,
-        keyInsights: ["API key not configured - unable to generate AI insights"],
-        bottlenecks: ["Please configure Google AI API key"],
-        opportunities: ["Set up API keys to enable AI analysis"],
-        forecastAccuracy: 0
-      };
-    }
 
     try {
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemini-2.5-flash',
+        model,
         customerId,
         featureUsed: 'business_analysis',
         systemInstruction: "You are a CRM analytics expert. Provide concise, actionable insights in valid JSON format only. Do not wrap the JSON in markdown code blocks."
       });
 
-      // Content is already stripped in generateContent, but parse safely
-      try {
-        return JSON.parse(response.content);
-      } catch (parseError) {
-        console.warn('Failed to parse JSON response, attempting additional cleanup:', parseError);
-        // Additional cleanup attempt
-        const cleanedContent = response.content
-          .replace(/^[^{]*/, '') // Remove any text before the first {
-          .replace(/[^}]*$/, ''); // Remove any text after the last }
-        return JSON.parse(cleanedContent);
-      }
+      return this.parseJSON(response.content);
     } catch (error) {
       console.warn('Error generating insights:', error);
-      return {
-        healthScore: 0,
-        keyInsights: ["Unable to generate insights at this time."],
-        bottlenecks: ["Analysis service unavailable"],
-        opportunities: ["Manual review required"],
-        forecastAccuracy: 0
-      };
+      throw error;
     }
   }
 
@@ -336,12 +217,6 @@ class EnhancedGeminiService {
     context?: string;
   }, customerId?: string, model?: string): Promise<{ subject: string; body: string }> {
     
-    if (!this.isValidApiKey()) {
-      return {
-        subject: `Following up: ${context.purpose}`,
-        body: `Dear ${context.recipient},\n\nI hope this email finds you well.\n\n[Please configure Google AI API key to enable AI-generated content]\n\nBest regards`
-      };
-    }
 
     const tone = context.tone || 'professional';
     const prompt = `
@@ -361,29 +236,16 @@ class EnhancedGeminiService {
     try {
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemma-2-9b-it',
+        model,
         customerId,
         featureUsed: 'email-generation',
         systemInstruction: "You are a professional email writing assistant. Write clear, engaging emails that drive action. Return only valid JSON without markdown formatting."
       });
 
-      // Content is already stripped in generateContent, but parse safely
-      try {
-        return JSON.parse(response.content);
-      } catch (parseError) {
-        console.warn('Failed to parse JSON response, attempting additional cleanup:', parseError);
-        // Additional cleanup attempt
-        const cleanedContent = response.content
-          .replace(/^[^{]*/, '') // Remove any text before the first {
-          .replace(/[^}]*$/, ''); // Remove any text after the last }
-        return JSON.parse(cleanedContent);
-      }
+      return this.parseJSON(response.content);
     } catch (error) {
       console.warn('Error generating email:', error);
-      return {
-        subject: `Following up: ${context.purpose}`,
-        body: `Dear ${context.recipient},\n\nI hope this email finds you well.\n\n[Generated content unavailable - please try again]\n\nBest regards`
-      };
+      throw error;
     }
   }
 
@@ -400,27 +262,6 @@ class EnhancedGeminiService {
     deliverables?: string[];
   }, customerId?: string, model?: string): Promise<string> {
     try {
-      if (!this.isValidApiKey()) {
-        return `BUSINESS PROPOSAL
-
-TO: ${context.clientName}
-COMPANY: ${context.companyName}
-PROJECT: ${context.projectDescription}
-
-EXECUTIVE SUMMARY
-This proposal outlines our recommended approach for ${context.projectDescription}.
-
-REQUIREMENTS
-${context.requirements?.map(req => `• ${req}`).join('\n') || '• To be discussed'}
-
-DELIVERABLES
-${context.deliverables?.map(item => `• ${item}`).join('\n') || '• Comprehensive solution'}
-
-TIMELINE: ${context.timeline || 'To be determined'}
-BUDGET: ${context.budget ? `$${context.budget.toLocaleString()}` : 'Upon consultation'}
-
-We look forward to discussing this opportunity further.`;
-      }
 
       const prompt = `Create a comprehensive business proposal with the following details:
 Client: ${context.clientName}
@@ -435,7 +276,7 @@ Generate a professional proposal with sections for Executive Summary, Project Ov
 
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemini-1.5-pro',
+        model,
         temperature: 0.6,
         maxTokens: 2000,
         customerId,
@@ -473,7 +314,7 @@ Create a structured script with opening, discovery questions, value proposition,
 
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemini-1.5-flash',
+        model,
         temperature: 0.7,
         maxTokens: 1500,
         customerId,
@@ -511,7 +352,7 @@ Format the response as structured data.`;
 
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemini-1.5-pro',
+        model,
         temperature: 0.5,
         maxTokens: 2000,
         customerId,
@@ -552,7 +393,7 @@ Provide analysis on:
 
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemini-1.5-pro',
+        model,
         temperature: 0.6,
         maxTokens: 2000,
         customerId,
@@ -600,27 +441,29 @@ Support tickets (last 30 days): ${context.engagementData.supportTickets}
 Purchase history: ${JSON.stringify(context.engagementData.purchaseHistory)}
 Customer profile: ${JSON.stringify(context.customerProfile)}
 
-Provide a churn risk score (0-100) and specific recommendations to retain the customer.`;
+Respond as JSON: {"riskScore": number 0-100, "riskLevel": "low"|"medium"|"high", "analysis": "markdown explanation of the main risk drivers", "recommendations": ["specific retention action", ...]}`;
 
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemini-1.5-pro',
+        model,
         temperature: 0.3,
-        maxTokens: 1000,
+        maxTokens: 1200,
         customerId,
-        featureUsed: 'churn_prediction'
+        featureUsed: 'churn_prediction',
+        systemInstruction: 'You are a customer success analyst. Return only valid JSON.'
       });
 
-      // Extract risk score from response
-      const content = this.stripMarkdownCodeBlocks(response.content);
-      const riskMatch = content.match(/risk.*?(\d+)/i);
-      const riskScore = riskMatch ? parseInt(riskMatch[1]) : 50;
+      const parsed = this.parseJSON(response.content);
+      const riskScore = Math.min(Math.max(Number(parsed.riskScore) || 0, 0), 100);
+      const recommendations: string[] = Array.isArray(parsed.recommendations) ? parsed.recommendations : [];
 
       return {
         customerId: context.customerId,
-        riskScore: Math.min(Math.max(riskScore, 0), 100),
-        analysis: content,
-        recommendations: content.split('recommendations:')[1] || 'Maintain regular contact',
+        riskScore,
+        riskLevel: parsed.riskLevel || (riskScore >= 70 ? 'high' : riskScore >= 40 ? 'medium' : 'low'),
+        analysis: parsed.analysis || '',
+        recommendations: recommendations.join('\n'),
+        recommendationList: recommendations,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
@@ -634,39 +477,33 @@ Provide a churn risk score (0-100) and specific recommendations to retain the cu
    */
   async analyzeSentiment(text: string, customerId?: string, model?: string): Promise<any> {
     try {
-      const prompt = `Analyze the sentiment of the following text and provide:
-1. Overall sentiment (positive, negative, neutral)
-2. Sentiment score (-1 to 1)
-3. Key emotional indicators
-4. Confidence level
-5. Specific concerns or positive aspects
+      const prompt = `Analyze the sentiment of the following text.
 
-Text: "${text}"`;
+Text: """${text}"""
+
+Respond as JSON: {"sentiment": "positive"|"negative"|"neutral", "score": number from -1 to 1, "confidence": number 0-1, "emotions": ["key emotional indicator", ...], "concerns": ["..."], "positives": ["..."], "analysis": "short markdown summary"}`;
 
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemini-1.5-flash',
-        temperature: 0.3,
-        maxTokens: 500,
+        model,
+        temperature: 0.2,
+        maxTokens: 800,
         customerId,
-        featureUsed: 'sentiment_analysis'
+        featureUsed: 'sentiment_analysis',
+        systemInstruction: 'You are a sentiment analysis engine. Return only valid JSON.'
       });
 
-      const content = this.stripMarkdownCodeBlocks(response.content);
-      
-      // Extract sentiment score
-      const scoreMatch = content.match(/score.*?(-?\d*\.?\d+)/i);
-      const sentimentScore = scoreMatch ? parseFloat(scoreMatch[1]) : 0;
-
-      // Extract sentiment type
-      const sentimentMatch = content.match(/(positive|negative|neutral)/i);
-      const sentiment = sentimentMatch ? sentimentMatch[1].toLowerCase() : 'neutral';
-
+      const parsed = this.parseJSON(response.content);
+      const sentiment = String(parsed.sentiment || 'neutral').toLowerCase();
       return {
         text,
-        sentiment,
-        score: Math.min(Math.max(sentimentScore, -1), 1),
-        analysis: content,
+        sentiment: ['positive', 'negative', 'neutral'].includes(sentiment) ? sentiment : 'neutral',
+        score: Math.min(Math.max(Number(parsed.score) || 0, -1), 1),
+        confidence: parsed.confidence,
+        emotions: parsed.emotions || [],
+        concerns: parsed.concerns || [],
+        positives: parsed.positives || [],
+        analysis: parsed.analysis || '',
         timestamp: new Date().toISOString()
       };
     } catch (error) {
@@ -701,7 +538,7 @@ Generate an engaging post that drives engagement and aligns with the platform's 
 
       const response = await this.generateContent({
         prompt,
-        model: model || 'gemini-1.5-flash',
+        model,
         temperature: 0.8,
         maxTokens: 300,
         customerId,

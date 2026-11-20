@@ -1,12 +1,58 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { VitePWA } from 'vite-plugin-pwa';
 
+/**
+ * Dev-only: serve the Netlify AI function (netlify/functions/ai.ts) at /api/ai/*
+ * so AI tools work with plain `npm run dev`. In production Netlify routes
+ * /api/ai/* to the deployed function (see netlify.toml).
+ */
+function aiGatewayDevPlugin(): Plugin {
+  return {
+    name: 'ai-gateway-dev',
+    apply: 'serve',
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use('/api/ai', async (req, res) => {
+        try {
+          const mod = await server.ssrLoadModule('/netlify/functions/ai.ts');
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) chunks.push(chunk as Buffer);
+          const headers = new Headers();
+          for (const [k, v] of Object.entries(req.headers)) {
+            if (typeof v === 'string') headers.set(k, v);
+          }
+          const request = new Request(`http://localhost/api/ai${req.url || ''}`, {
+            method: req.method,
+            headers,
+            body: req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks),
+          });
+          const response: Response = await mod.default(request);
+          res.statusCode = response.status;
+          response.headers.forEach((value, key) => res.setHeader(key, value));
+          res.end(Buffer.from(await response.arrayBuffer()));
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: e?.message || 'AI dev gateway failed' }));
+        }
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Expose server-only secrets from .env (OPENAI_API_KEY, GEMINI_API_KEY, ...) to the dev gateway.
+  const serverEnv = loadEnv(mode, process.cwd(), '');
+  for (const [k, v] of Object.entries(serverEnv)) {
+    if (process.env[k] === undefined) process.env[k] = v;
+  }
+
+  return {
   plugins: [
     react(),
+    aiGatewayDevPlugin(),
     visualizer({
       filename: 'dist/stats.html',
       open: false,
@@ -17,6 +63,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.gemini\./,
@@ -97,4 +144,5 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 1000,
   },
+};
 });

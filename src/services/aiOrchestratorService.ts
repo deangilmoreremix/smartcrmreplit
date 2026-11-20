@@ -48,9 +48,7 @@ class AIOrchestratorService {
 
   private initializeStats() {
     const models = [
-      'gemma-2-2b-it', 'gemma-2-9b-it', 'gemma-2-27b-it',
-      'gemini-2.5-flash', 'gemini-2.5-flash-8b',
-      'gpt-4o-mini', 'gpt-3.5-turbo'
+      'gpt-4o-mini', 'gpt-4o'
     ];
 
     models.forEach(model => {
@@ -138,21 +136,8 @@ class AIOrchestratorService {
    * Check if any required API keys are available
    */
   private hasAvailableProvider(): boolean {
-    // Check for Google AI API key
-    const googleKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
-    const googleKeyValid = googleKey && 
-                          googleKey.length > 10 && 
-                          !googleKey.includes('your_google_ai_api_key') &&
-                          !googleKey.startsWith('your_');
-    
-    // Check for OpenAI API key                      
-    const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    const openaiKeyValid = openaiKey && 
-                          openaiKey.length > 10 && 
-                          !openaiKey.includes('your_openai_api_key') &&
-                          !openaiKey.startsWith('your_');
-                          
-    return googleKeyValid || openaiKeyValid;
+    // AI runs server-side via /api/ai (OpenAI). Missing keys are reported by the gateway.
+    return true;
   }
 
   /**
@@ -176,36 +161,9 @@ class AIOrchestratorService {
       feature === 'lead_qualification' ? 'lead_qualification' : 
       'categorization';
 
-    // Check which providers are available
-    const googleKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
-    const googleKeyValid = googleKey && 
-                          googleKey.length > 10 && 
-                          !googleKey.includes('your_google_ai_api_key') &&
-                          !googleKey.startsWith('your_');
-    
-    const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    const openaiKeyValid = openaiKey && 
-                          openaiKey.length > 10 && 
-                          !openaiKey.includes('your_openai_api_key') &&
-                          !openaiKey.startsWith('your_');
-    
-    // Based on available providers, choose appropriate model
-    if (googleKeyValid) {
-      // If Google AI is available, use it for most tasks
-      if (context.priority === 'speed') {
-        return 'gemma-2-2b-it';
-      } else if (context.priority === 'quality' && feature === 'business_analysis') {
-        return openaiKeyValid ? 'gpt-4o-mini' : 'gemini-2.5-flash';
-      } else {
-        return 'gemini-2.5-flash';
-      }
-    } else if (openaiKeyValid) {
-      // If only OpenAI is available
-      return context.priority === 'cost' ? 'gpt-3.5-turbo' : 'gpt-4o-mini';
-    }
-    
-    // No valid API keys, return a default
-    return 'gemini-2.5-flash';
+    void modelType;
+    // All AI runs on OpenAI via the server-side gateway; the server applies its default model.
+    return 'gpt-4o-mini';
   }
 
   /**
@@ -573,7 +531,7 @@ class AIOrchestratorService {
     // For complex analytical tasks like deal analysis, prefer more capable models
     const useGPT4 = dealData.deals && dealData.deals.some((deal: any) => deal.value > 100000) || 
                    taskContext.complexity === 'high';
-    const defaultModelId = useGPT4 ? 'gpt-4o-mini' : 'gemini-2.5-flash';
+    const defaultModelId = 'gpt-4o-mini';
     
     const modelId = await this.getOptimalModel('deal_insights', {
       ...taskContext,
@@ -682,7 +640,7 @@ class AIOrchestratorService {
     // For contact analysis, prefer models with good pattern recognition
     const modelId = await this.getOptimalModel('contact_scoring', {
       ...taskContext,
-      modelId: taskContext.modelId || 'gemini-2.5-flash'
+      modelId: taskContext.modelId || 'gpt-4o-mini'
     });
     
     const startTime = Date.now();
