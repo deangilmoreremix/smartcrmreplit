@@ -62,7 +62,7 @@ export const AI_TOOLS: AIToolDefinition[] = [
   // Content
   { id: 'social-media-generator', title: 'Social Media Generator', description: 'Platform-specific posts with hashtags and CTA.', category: 'Content', icon: Megaphone, component: lazy(() => import('./SocialMediaGenerator')) },
   { id: 'visual-content-generator', title: 'Visual Content Generator', description: 'Concepts and copy for visual sales content.', category: 'Content', icon: Image, component: lazy(() => import('./VisualContentGeneratorContent')) },
-  { id: 'image-generator', title: 'Image Generator', description: 'Generate images with OpenAI.', category: 'Content', icon: Image, component: lazy(() => import('./ImageGeneratorContent')) },
+  { id: 'image-generator', title: 'Image Studio', description: 'Generate and edit images with GPT Image 2.6: transparent PNGs, GIFs, SVGs and markup edits.', category: 'Content', icon: Image, component: lazy(() => import('./ImageGeneratorContent')) },
 
   // Assistant
   { id: 'ai-assistant-chat', title: 'AI Assistant Chat', description: 'Chat with a configurable sales assistant.', category: 'Assistant', icon: Brain, component: lazy(() => import('./AIAssistantChat')) },

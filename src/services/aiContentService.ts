@@ -133,20 +133,20 @@ Provide: overall sentiment and urgency, the customer's key requests/questions, c
 }
 
 export async function analyzeCompetitor(competitorName: string, industry: string, ourStrengths: string[] = [], extraContext = '') {
-  return aiClient.text(
+  return aiClient.researchText(
     `Produce a competitive analysis of "${competitorName}" in the ${industry} industry.
 
 Our strengths:
 ${list(ourStrengths)}
 ${extraContext ? `\nAdditional material provided by the user:\n"""\n${extraContext.slice(0, 20000)}\n"""` : ''}
 
-Cover: market position, likely strengths and weaknesses, pricing approach, how we differentiate, battlecard talking points, and landmines to set in deals. Note clearly where you are making assumptions.`,
+Cover: market position, likely strengths and weaknesses, pricing approach, how we differentiate, battlecard talking points, and landmines to set in deals. Use web search for current, public facts (pricing, positioning, recent news) and cite them; clearly label anything you infer.`,
     { system: SALES_SYSTEM, temperature: 0.5 },
   );
 }
 
 export async function analyzeMarketTrends(industry: string, targetMarket: string, timeframe: string, extraContext = '') {
-  return aiClient.text(
+  return aiClient.researchText(
     `Analyze market trends.
 
 Industry: ${industry}
@@ -154,7 +154,7 @@ Target market: ${targetMarket}
 Timeframe: ${timeframe}
 ${extraContext ? `\nAdditional material provided by the user:\n"""\n${extraContext.slice(0, 20000)}\n"""` : ''}
 
-Cover: key trends, growth drivers, emerging technologies, buyer behavior changes, competitive shifts, risks, and concrete recommendations for a sales team. Note clearly where you are making assumptions.`,
+Cover: key trends, growth drivers, emerging technologies, buyer behavior changes, competitive shifts, risks, and concrete recommendations for a sales team. Use web search for current, public facts (pricing, positioning, recent news) and cite them; clearly label anything you infer.`,
     { system: SALES_SYSTEM, temperature: 0.6 },
   );
 }
@@ -313,9 +313,9 @@ async function enrich(description: string, seed: Partial<ContactEnrichmentData>)
   const r = await aiClient.json<ContactEnrichmentData>(
     `${description}
 
-You do not have web access: only infer what is reasonable from the information given, leave unknown fields empty, and set a realistic confidence.
+Use web search to find this person's PUBLIC professional information only (role, company, company website, public LinkedIn URL, location at city level). Never guess personal emails or phone numbers: only include contact details that are published publicly for business use. Leave unknown fields empty, and set confidence to reflect how well the sources match this exact person. Put the source URLs in "notes".
 Return JSON: ${ENRICHMENT_SHAPE}`,
-    { temperature: 0.2 },
+    { temperature: 0.2, webSearch: true },
   );
   const merged = { ...r, ...Object.fromEntries(Object.entries(seed).filter(([, v]) => v)) } as ContactEnrichmentData;
   merged.name = merged.name || [merged.firstName, merged.lastName].filter(Boolean).join(' ');

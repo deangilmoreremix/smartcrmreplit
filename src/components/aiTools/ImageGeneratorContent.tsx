@@ -1,248 +1,270 @@
 import React, { useState } from 'react';
-import { useOpenAIImage } from '../../services/openaiImageService';
-import AIToolContent from '../shared/AIToolContent';
-import { Image, Camera, RefreshCw, Download, Copy, Check, Lightbulb, Grid3X3, Layout } from 'lucide-react';
+import { Image as ImageIcon, RefreshCw, Download, Wand2, Upload, X, Sparkles } from 'lucide-react';
+import { openaiImageService, IMAGE_MODELS, type ImageEditOptions } from '../../services/openaiImageService';
+import { fileToDataURL } from '../../services/openaiVisionService';
 
+type Mode = 'generate' | 'edit';
+type Format = NonNullable<ImageEditOptions['output_format']>;
+
+const SAMPLE_PROMPTS = [
+  'Professional business team collaborating in a modern office, natural light',
+  'Clean product hero shot of a CRM dashboard on a laptop, studio lighting',
+  'Minimal flat illustration of a sales funnel with upward growth arrows',
+  'Friendly mascot logo for a sales app on a transparent background',
+];
+
+const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // the serverless request body limit is ~6 MB in total
+
+const Select: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<[string, string]>;
+  id: string;
+}> = ({ label, value, onChange, options, id }) => (
+  <div>
+    <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
+      {label}
+    </label>
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-2 border border-gray-300 rounded-md">
+      {options.map(([v, l]) => (
+        <option key={v} value={v}>
+          {l}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+/** GPT Image 2.6: generate or edit images (Flare / Sunburst) with streaming previews, GIF and SVG output. */
 const ImageGeneratorContent: React.FC = () => {
-  const imageService = useOpenAIImage();
-  
+  const [mode, setMode] = useState<Mode>('generate');
   const [prompt, setPrompt] = useState('');
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  const [revisedPrompt, setRevisedPrompt] = useState<string | null>(null);
+  const [model, setModel] = useState<string>('gpt-image-2.6-flare');
+  const [size, setSize] = useState('auto');
+  const [quality, setQuality] = useState('auto');
+  const [complexity, setComplexity] = useState('low');
+  const [background, setBackground] = useState('auto');
+  const [format, setFormat] = useState<Format>('png');
+  const [frameCount, setFrameCount] = useState(9);
+  const [frameDuration, setFrameDuration] = useState(200);
+
+  const [sources, setSources] = useState<Array<{ name: string; url: string }>>([]);
+  const [guide, setGuide] = useState<{ kind: 'mask' | 'markup'; name: string; url: string } | null>(null);
+
+  const [preview, setPreview] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imageSize, setImageSize] = useState<'1024x1024' | '1792x1024' | '1024x1792'>('1024x1024');
-  const [imageStyle, setImageStyle] = useState<'natural' | 'vivid'>('natural');
-  const [imageQuality, setImageQuality] = useState<'standard' | 'hd'>('standard');
-  const [promptCopied, setPromptCopied] = useState(false);
-  
-  // Sample prompts for quick selection
-  const samplePrompts = [
-    "Professional business team collaborating in a modern office setting",
-    "Product showcase for a sleek new CRM dashboard",
-    "Visual representation of increasing sales and growth",
-    "Business person analyzing data with attractive data visualizations",
-    "Minimalist product feature comparison chart"
-  ];
-  
-  const handleGenerateImage = async () => {
-    if (!prompt) {
-      setError('Please enter a prompt');
-      return;
+
+  const switchMode = (m: Mode) => {
+    setMode(m);
+    setModel(m === 'edit' ? 'gpt-image-2.6-sunburst' : 'gpt-image-2.6-flare');
+    setError(null);
+  };
+
+  const readFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    try {
+      const added: Array<{ name: string; url: string }> = [];
+      for (const f of Array.from(files)) {
+        if (!f.type.startsWith('image/')) throw new Error(`${f.name} is not an image.`);
+        if (f.size > MAX_UPLOAD_BYTES) throw new Error(`${f.name} is larger than 4 MB.`);
+        added.push({ name: f.name, url: await fileToDataURL(f) });
+      }
+      setSources((prev) => [...prev, ...added].slice(0, 16));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not read the image');
     }
-    
+  };
+
+  const readGuide = async (kind: 'mask' | 'markup', file?: File) => {
+    if (!file) return;
+    if (file.type !== 'image/png') return setError(`The ${kind} must be a PNG with transparency.`);
+    if (file.size > MAX_UPLOAD_BYTES) return setError(`The ${kind} is larger than 4 MB.`);
+    setGuide({ kind, name: file.name, url: await fileToDataURL(file) });
+  };
+
+  const run = async () => {
+    if (!prompt.trim()) return setError('Describe the image you want.');
+    if (mode === 'edit' && !sources.length) return setError('Upload at least one image to edit.');
     setIsLoading(true);
     setError(null);
-    
+    setPreview(null);
+    setResult(null);
+
+    const opts: ImageEditOptions = {
+      model: model as ImageEditOptions['model'],
+      size,
+      quality: quality as ImageEditOptions['quality'],
+      complexity: complexity as ImageEditOptions['complexity'],
+      background: background as ImageEditOptions['background'],
+      output_format: format,
+      ...(format === 'gif' ? { frame_count: frameCount, frame_duration_ms: frameDuration } : {}),
+      ...(mode === 'edit' && guide ? { [guide.kind]: guide.url } : {}),
+    };
     try {
-      const result = await imageService.generateImage(prompt, imageSize, imageQuality, imageStyle);
-      
-      setGeneratedImageUrl(result.url);
-      setRevisedPrompt(result.revisedPrompt);
-    } catch (err) {
-      console.error('Error generating image:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      const res =
+        mode === 'edit'
+          ? await openaiImageService.edit(prompt, sources.map((s) => s.url), opts, (url) => setPreview(url))
+          : await openaiImageService.generate(prompt, opts, (url) => setPreview(url));
+      setResult(res.images[0]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Image generation failed');
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const handleDownloadImage = () => {
-    if (generatedImageUrl) {
-      const link = document.createElement('a');
-      link.href = generatedImageUrl;
-      link.download = `generated-image-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+
+  const download = () => {
+    if (!result) return;
+    const a = document.createElement('a');
+    a.href = result;
+    a.download = `smartcrm-image-${Date.now()}.${format === 'jpeg' ? 'jpg' : format}`;
+    a.click();
   };
-  
-  const handleCopyPrompt = () => {
-    if (revisedPrompt) {
-      navigator.clipboard.writeText(revisedPrompt);
-      setPromptCopied(true);
-      setTimeout(() => setPromptCopied(false), 2000);
-    }
-  };
-  
-  const handleUseSamplePrompt = (sample: string) => {
-    setPrompt(sample);
-  };
+
+  const shown = result || preview;
+  const transparentOk = format === 'png' || format === 'webp';
 
   return (
     <div className="space-y-6">
-      <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
-        <div className="flex items-start">
-          <Image className="text-emerald-600 mt-1 mr-3 h-5 w-5" />
-          <div>
-            <h3 className="font-medium text-emerald-800">DALL·E Image Generator</h3>
-            <p className="text-sm text-emerald-700 mt-1">
-              Create professional images for presentations, proposals, and marketing materials.
-            </p>
-          </div>
+      <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 flex items-start">
+        <ImageIcon className="text-indigo-600 mt-1 mr-3 h-5 w-5" />
+        <div>
+          <h3 className="font-medium text-indigo-800">Image Studio — GPT Image 2.6</h3>
+          <p className="text-sm text-indigo-700 mt-1">
+            Generate new images or edit your own. Flare is fastest; Sunburst gives more detail and more consistent edits.
+          </p>
         </div>
       </div>
 
-      <AIToolContent
-        isLoading={isLoading}
-        error={error}
-        result={null} // We're not using the standard result display for this component
-        loadingMessage="Generating image..."
-        resultTitle="Generated Image"
-      >
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-1">
-              Image Description
-            </label>
-            <textarea
-              id="prompt"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the image you want to generate..."
-              className="w-full p-2 border rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-              rows={4}
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <Lightbulb className="inline h-4 w-4 mr-1 text-amber-500" />
-              Need inspiration? Try one of these:
-            </label>
+      <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden" role="tablist">
+        {(['generate', 'edit'] as Mode[]).map((m) => (
+          <button
+            key={m}
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => switchMode(m)}
+            className={`px-4 py-2 text-sm ${mode === m ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}
+          >
+            {m === 'generate' ? 'Generate' : 'Edit images'}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'edit' && (
+        <div className="space-y-3">
+          <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-sm text-gray-600">
+            <Upload size={16} /> Upload images to edit or combine (up to 16, 4 MB each)
+            <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" onChange={(e) => { readFiles(e.target.files); e.target.value = ''; }} />
+          </label>
+          {sources.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {samplePrompts.map((sample, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleUseSamplePrompt(sample)}
-                  className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 truncate max-w-xs"
-                >
-                  {sample}
-                </button>
-              ))}
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Grid3X3 size={16} className="mr-1 text-gray-500" />
-                Image Size
-              </label>
-              <select
-                value={imageSize}
-                onChange={(e) => setImageSize(e.target.value as any)}
-                className="w-full p-2 border rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="1024x1024">Square (1:1)</option>
-                <option value="1792x1024">Landscape (16:9)</option>
-                <option value="1024x1792">Portrait (9:16)</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Layout size={16} className="mr-1 text-gray-500" />
-                Style
-              </label>
-              <select
-                value={imageStyle}
-                onChange={(e) => setImageStyle(e.target.value as any)}
-                className="w-full p-2 border rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="natural">Natural</option>
-                <option value="vivid">Vivid</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Camera size={16} className="mr-1 text-gray-500" />
-                Quality
-              </label>
-              <select
-                value={imageQuality}
-                onChange={(e) => setImageQuality(e.target.value as any)}
-                className="w-full p-2 border rounded-md focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="standard">Standard</option>
-                <option value="hd">HD</option>
-              </select>
-              {imageQuality === 'hd' && (
-                <p className="text-xs text-gray-500 mt-1">HD quality uses more API credits</p>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex justify-end">
-            <button
-              onClick={handleGenerateImage}
-              disabled={isLoading || !prompt.trim()}
-              className={`px-4 py-2 rounded-md text-white font-medium flex items-center ${
-                isLoading || !prompt.trim()
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-600 hover:bg-emerald-700'
-              }`}
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw size={18} className="animate-spin mr-2" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Camera size={18} className="mr-2" />
-                  Generate Image
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-        
-        {/* Generated Image Result */}
-        {generatedImageUrl && !isLoading && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Generated Image</h3>
-            
-            <div className="mb-4 rounded-lg overflow-hidden shadow-sm border border-gray-200">
-              <img 
-                src={generatedImageUrl} 
-                alt="Generated image" 
-                className="w-full h-auto object-contain"
-              />
-            </div>
-            
-            {revisedPrompt && (
-              <div className="mb-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-1">Revised Prompt:</h4>
-                <div className="relative">
-                  <div className="bg-white p-3 rounded-md border border-gray-200 text-sm text-gray-800">
-                    {revisedPrompt}
-                  </div>
-                  <button
-                    onClick={handleCopyPrompt}
-                    className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                    title="Copy revised prompt"
-                  >
-                    {promptCopied ? <Check size={16} /> : <Copy size={16} />}
+              {sources.map((s, i) => (
+                <div key={i} className="relative">
+                  <img src={s.url} alt={s.name} className="h-16 w-16 object-cover rounded border" />
+                  <button aria-label={`Remove ${s.name}`} onClick={() => setSources(sources.filter((_, j) => j !== i))} className="absolute -top-2 -right-2 bg-white rounded-full border p-0.5">
+                    <X size={12} />
                   </button>
                 </div>
-              </div>
-            )}
-            
-            <div className="flex justify-end">
-              <button
-                onClick={handleDownloadImage}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-              >
-                <Download size={16} className="mr-1.5" />
-                Download Image
-              </button>
+              ))}
             </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            {(['mask', 'markup'] as const).map((kind) => (
+              <label key={kind} className="flex items-center gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
+                <Upload size={14} />
+                <span>
+                  {kind === 'mask' ? 'Optional mask PNG (transparent = area to change)' : 'Optional markup PNG (draw marks over the first image)'}
+                </span>
+                <input type="file" accept="image/png" className="hidden" onChange={(e) => { readGuide(kind, e.target.files?.[0]); e.target.value = ''; }} />
+              </label>
+            ))}
+          </div>
+          {guide && (
+            <p className="text-xs text-gray-600">
+              Using {guide.kind}: {guide.name}{' '}
+              <button className="underline" onClick={() => setGuide(null)}>remove</button>
+              {guide.kind === 'markup' && ' — must be the same size as the first image.'}
+            </p>
+          )}
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="img-prompt" className="block text-sm font-medium text-gray-700 mb-1">
+          {mode === 'edit' ? 'What should change?' : 'Describe the image'}
+        </label>
+        <textarea
+          id="img-prompt"
+          rows={3}
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          className="w-full p-3 border border-gray-300 rounded-lg"
+          placeholder={mode === 'edit' ? 'e.g. Replace the background with a bright office and add our logo top-right' : 'e.g. A clean product photo of…'}
+        />
+        {mode === 'generate' && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {SAMPLE_PROMPTS.map((p) => (
+              <button key={p} type="button" onClick={() => setPrompt(p)} className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 rounded hover:bg-indigo-100">
+                {p}
+              </button>
+            ))}
           </div>
         )}
-      </AIToolContent>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <Select id="img-model" label="Model" value={model} onChange={setModel} options={IMAGE_MODELS.map((m) => [m.id, `${m.name} — ${m.description}`])} />
+        <Select id="img-size" label="Size" value={size} onChange={setSize} options={[['auto', 'Auto'], ['1024x1024', 'Square 1024×1024'], ['1536x1024', 'Landscape 1536×1024'], ['1024x1536', 'Portrait 1024×1536']]} />
+        <Select id="img-quality" label="Quality" value={quality} onChange={setQuality} options={[['auto', 'Auto'], ['low', 'Low (fastest)'], ['medium', 'Medium'], ['high', 'High'], ['xhigh', 'Extra high'], ['max', 'Max']]} />
+        <Select id="img-complexity" label="Planning (complexity)" value={complexity} onChange={setComplexity} options={[['low', 'Low — fastest, best for edits'], ['medium', 'Medium'], ['high', 'High — most planning']]} />
+        <Select id="img-format" label="Format" value={format} onChange={(v) => { setFormat(v as Format); if (v !== 'png' && v !== 'webp' && background === 'transparent') setBackground('auto'); }} options={[['png', 'PNG'], ['jpeg', 'JPEG'], ['webp', 'WebP'], ['gif', 'Animated GIF (preview access)'], ['svg', 'SVG vector (preview access)']]} />
+        <Select id="img-bg" label="Background" value={background} onChange={setBackground} options={[['auto', 'Auto'], ['opaque', 'Opaque'], ...(transparentOk ? [['transparent', 'Transparent'] as [string, string]] : [])]} />
+      </div>
+
+      {format === 'gif' && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="img-frames" className="block text-sm font-medium text-gray-700 mb-1">Frames (2–16)</label>
+            <input id="img-frames" type="number" min={2} max={16} value={frameCount} onChange={(e) => setFrameCount(Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded-md" />
+          </div>
+          <div>
+            <label htmlFor="img-duration" className="block text-sm font-medium text-gray-700 mb-1">Frame duration (ms)</label>
+            <input id="img-duration" type="number" min={20} step={10} value={frameDuration} onChange={(e) => setFrameDuration(Number(e.target.value))} className="w-full p-2 border border-gray-300 rounded-md" />
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          onClick={run}
+          disabled={isLoading || !prompt.trim()}
+          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-300"
+        >
+          {isLoading ? <RefreshCw size={18} className="animate-spin mr-2" /> : mode === 'edit' ? <Wand2 size={18} className="mr-2" /> : <Sparkles size={18} className="mr-2" />}
+          {isLoading ? (preview ? 'Refining…' : 'Working…') : mode === 'edit' ? 'Apply edit' : 'Generate image'}
+        </button>
+      </div>
+
+      {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>}
+
+      {shown && (
+        <div className="space-y-2">
+          <div className="rounded-xl border overflow-hidden bg-[repeating-conic-gradient(#f3f4f6_0_25%,#fff_0_50%)] bg-[length:20px_20px]">
+            <img src={shown} alt={prompt} data-testid="generated-image" className={`w-full max-h-[60vh] object-contain ${result ? '' : 'opacity-80 blur-[1px]'}`} />
+          </div>
+          <div className="flex justify-between items-center text-sm text-gray-600">
+            <span>{result ? 'Done' : 'Preview — refining…'}</span>
+            {result && (
+              <button onClick={download} className="inline-flex items-center px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200">
+                <Download size={14} className="mr-1" /> Download
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

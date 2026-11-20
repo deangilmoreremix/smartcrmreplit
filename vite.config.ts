@@ -30,7 +30,16 @@ function aiGatewayDevPlugin(): Plugin {
           const response: Response = await mod.default(request);
           res.statusCode = response.status;
           response.headers.forEach((value, key) => res.setHeader(key, value));
-          res.end(Buffer.from(await response.arrayBuffer()));
+          // Stream the body through (image generation sends partial previews as server-sent events).
+          if (response.body) {
+            const reader = response.body.getReader();
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              res.write(Buffer.from(value));
+            }
+          }
+          res.end();
         } catch (e: any) {
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');

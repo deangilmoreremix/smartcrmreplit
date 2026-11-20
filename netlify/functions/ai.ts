@@ -1,5 +1,5 @@
 /**
- * Server-side AI gateway for SmartCRM.
+ * Server-side AI gateway for SmartCRM (OpenAI Responses API + Images API with GPT Image 2.6).
  *
  * All AI calls from the browser go through /api/ai/* (see netlify.toml), so
  * provider API keys stay on the server and never ship in the JS bundle.
@@ -11,12 +11,15 @@
  *   OPENAI_MODEL              default model, called via the Responses API (default: gpt-6.2-sol)
  *   OPENAI_REASONING_EFFORT   reasoning effort for reasoning models: minimal|low|medium|high|xhigh|max
  *                             (default: low — fast enough for interactive CRM tools)
- *   OPENAI_IMAGE_MODEL        image model                   (default: gpt-image-1)
+ *   OPENAI_IMAGE_MODEL        image generation model        (default: gpt-image-2.6-flare — fast)
+ *   OPENAI_IMAGE_EDIT_MODEL   image editing model           (default: gpt-image-2.6-sunburst — detail/consistency)
  *   OPENAI_TRANSCRIBE_MODEL   speech-to-text model          (default: whisper-1)
  *   OPENAI_EMBEDDING_MODEL    embedding model               (default: text-embedding-3-small)
  *   AI_REQUIRE_AUTH           "false" to allow calls without a Supabase session (default: required
  *                             whenever SUPABASE_URL / VITE_SUPABASE_URL is configured)
  */
+
+import { createHash } from 'node:crypto';
 
 type Role = 'system' | 'user' | 'assistant' | 'tool';
 
@@ -37,7 +40,11 @@ interface ChatRequest {
   maxTokens?: number;
   images?: string[]; // data: URLs or https URLs
   tools?: unknown[];
+  /** Let the model search the web (Responses API built-in web_search tool). */
+  webSearch?: boolean;
   model?: string;
+  /** Hashed user id, set by the router (not by the client). */
+  safetyIdentifier?: string;
 }
 
 const env = (name: string): string | undefined => {
@@ -63,10 +70,10 @@ class HttpError extends Error {
 // ---------------------------------------------------------------------------
 // Auth: require a valid Supabase session so this isn't an open proxy.
 // ---------------------------------------------------------------------------
-async function checkAuth(req: Request): Promise<void> {
+async function checkAuth(req: Request): Promise<string | undefined> {
   const supabaseUrl = env('SUPABASE_URL') || env('VITE_SUPABASE_URL');
   const anonKey = env('SUPABASE_ANON_KEY') || env('VITE_SUPABASE_ANON_KEY');
-  if (env('AI_REQUIRE_AUTH') === 'false' || !supabaseUrl || !anonKey) return;
+  if (env('AI_REQUIRE_AUTH') === 'false' || !supabaseUrl || !anonKey) return undefined;
 
   const auth = req.headers.get('authorization') || '';
   const token = auth.replace(/^Bearer\s+/i, '');
@@ -76,7 +83,13 @@ async function checkAuth(req: Request): Promise<void> {
     headers: { Authorization: `Bearer ${token}`, apikey: anonKey },
   });
   if (!res.ok) throw new HttpError(401, 'Your session has expired. Please sign in again.');
+  const user = await res.json().catch(() => ({}));
+  return user?.id;
 }
+
+/** Stable, non-reversible per-user id for OpenAI abuse monitoring (no email or raw id sent). */
+const safetyId = (userId?: string) =>
+  userId ? createHash('sha256').update(`smartcrm:${userId}`).digest('hex').slice(0, 64) : undefined;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -215,7 +228,10 @@ async function openaiChat(body: ChatRequest) {
   // max_output_tokens includes reasoning tokens, so leave headroom on reasoning models.
   if (body.maxTokens) payload.max_output_tokens = reasoning ? body.maxTokens + 4096 : body.maxTokens;
   if (body.json) payload.text = { format: { type: 'json_object' } };
-  if (body.tools?.length) payload.tools = toResponsesTools(body.tools);
+  const tools = toResponsesTools(body.tools);
+  if (body.webSearch) tools.push({ type: 'web_search' });
+  if (tools.length) payload.tools = tools;
+  if (body.safetyIdentifier) payload.safety_identifier = body.safetyIdentifier;
 
   const send = (p: Record<string, unknown>) =>
     fetch('https://api.openai.com/v1/responses', {
@@ -245,9 +261,22 @@ async function openaiChat(body: ChatRequest) {
     .filter((item: any) => item.type === 'function_call')
     .map((item: any) => ({ id: item.call_id, type: 'function', function: { name: item.name, arguments: item.arguments } }));
 
+  // Web search results come back as url_citation annotations on the output text.
+  const citations: Array<{ url: string; title?: string }> = [];
+  for (const item of data.output || []) {
+    for (const part of item.content || []) {
+      for (const a of part.annotations || []) {
+        if (a.type === 'url_citation' && a.url && !citations.some((c) => c.url === a.url)) {
+          citations.push({ url: a.url, title: a.title });
+        }
+      }
+    }
+  }
+
   const u = data.usage || {};
   return {
     text: extractText(data),
+    citations: citations.length ? citations : undefined,
     toolCalls: toolCalls.length ? toolCalls : undefined,
     provider: 'openai',
     model: data.model || model,
@@ -267,40 +296,142 @@ async function chat(body: ChatRequest) {
 // ---------------------------------------------------------------------------
 // Other endpoints
 // ---------------------------------------------------------------------------
-async function image(body: { prompt: string; size?: string; n?: number; quality?: string; style?: string }) {
-  const key = OPENAI_KEY();
-  if (!key) throw new HttpError(503, 'Image generation requires OPENAI_API_KEY.');
-  if (!body.prompt) throw new HttpError(400, 'prompt is required');
-  const model = env('OPENAI_IMAGE_MODEL') || 'gpt-image-1';
-  const isGptImage = model.startsWith('gpt-image');
-  // gpt-image models use different size/quality values than DALL-E 3; map the UI's options.
-  const sizeMap: Record<string, string> = { '1792x1024': '1536x1024', '1024x1792': '1024x1536' };
-  const qualityMap: Record<string, string> = { standard: 'medium', hd: 'high' };
-  const size = body.size || '1024x1024';
-  const payload: Record<string, unknown> = {
-    model,
-    prompt: body.prompt,
-    n: Math.min(Math.max(body.n || 1, 1), 4),
-    size: isGptImage ? sizeMap[size] || size : size,
-  };
-  if (body.quality) payload.quality = isGptImage ? qualityMap[body.quality] || body.quality : body.quality;
-  if (!isGptImage) {
-    payload.response_format = 'b64_json';
-    if (body.style && model === 'dall-e-3') payload.style = body.style;
+// ---------------------------------------------------------------------------
+// Images API — GPT Image 2.6 (gpt-image-2.6-flare: fast, gpt-image-2.6-sunburst: detail/editing)
+// ---------------------------------------------------------------------------
+const IMAGE_MODELS = ['gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'];
+const IMAGE_MODEL = () => env('OPENAI_IMAGE_MODEL') || 'gpt-image-2.6-flare';
+const IMAGE_EDIT_MODEL = () => env('OPENAI_IMAGE_EDIT_MODEL') || 'gpt-image-2.6-sunburst';
+const MIME: Record<string, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' };
+
+interface ImageRequest {
+  prompt: string;
+  model?: string;
+  size?: string;
+  quality?: string;
+  n?: number;
+  background?: 'auto' | 'opaque' | 'transparent';
+  output_format?: 'png' | 'jpeg' | 'webp' | 'gif' | 'svg';
+  output_compression?: number;
+  moderation?: 'auto' | 'low';
+  complexity?: 'low' | 'medium' | 'high';
+  frame_count?: number;
+  frame_duration_ms?: number;
+  stream?: boolean;
+  partial_images?: number;
+  // edits only
+  images?: string[]; // data URLs or https URLs, up to 16
+  mask?: string; // PNG with alpha; cannot be combined with markup
+  markup?: string; // transparent PNG overlay with marks, same size as the first image
+  input_fidelity?: 'high' | 'low';
+}
+
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[], field: string): T | undefined => {
+  if (v === undefined || v === null || v === '') return undefined;
+  if (!allowed.includes(v as T)) throw new HttpError(400, `Invalid ${field}: ${v}. Use one of: ${allowed.join(', ')}.`);
+  return v as T;
+};
+
+function imagePayload(body: ImageRequest, defaultModel: string, safetyIdentifier?: string) {
+  if (!body.prompt?.trim()) throw new HttpError(400, 'prompt is required');
+  if (body.prompt.length > 32000) throw new HttpError(400, 'prompt is too long (max 32,000 characters)');
+  const model = body.model && IMAGE_MODELS.includes(body.model) ? body.model : defaultModel;
+
+  // Legacy DALL-E option values from older UI code.
+  const legacySize: Record<string, string> = { '1792x1024': '1536x1024', '1024x1792': '1024x1536' };
+  const legacyQuality: Record<string, string> = { standard: 'medium', hd: 'high' };
+  const size = body.size ? legacySize[body.size] || body.size : undefined;
+  if (size && size !== 'auto' && !/^\d{2,4}x\d{2,4}$/.test(size)) throw new HttpError(400, `Invalid size: ${size}`);
+  const quality = oneOf(body.quality ? legacyQuality[body.quality] || body.quality : undefined,
+    ['auto', 'low', 'medium', 'high', 'xhigh', 'max'] as const, 'quality');
+  const background = oneOf(body.background, ['auto', 'opaque', 'transparent'] as const, 'background');
+  let format = oneOf(body.output_format, ['png', 'jpeg', 'webp', 'gif', 'svg'] as const, 'output_format');
+  if (background === 'transparent' && (!format || format === 'jpeg')) format = 'png';
+  if (background === 'transparent' && (format === 'gif' || format === 'svg')) {
+    throw new HttpError(400, 'Transparent backgrounds need PNG or WebP output.');
   }
 
-  const res = await fetch('https://api.openai.com/v1/images/generations', {
+  const payload: Record<string, unknown> = { model, prompt: body.prompt };
+  if (size) payload.size = size;
+  if (quality) payload.quality = quality;
+  if (background) payload.background = background;
+  if (format) payload.output_format = format;
+  if (body.n) payload.n = Math.min(Math.max(Math.round(body.n), 1), format === 'svg' ? 1 : 4);
+  const complexity = oneOf(body.complexity, ['low', 'medium', 'high'] as const, 'complexity');
+  if (complexity) payload.complexity = complexity;
+  const moderation = oneOf(body.moderation, ['auto', 'low'] as const, 'moderation');
+  if (moderation) payload.moderation = moderation;
+  if (body.output_compression !== undefined && (format === 'jpeg' || format === 'webp')) {
+    payload.output_compression = Math.min(Math.max(Math.round(body.output_compression), 0), 100);
+  }
+  if (format === 'gif') {
+    if (body.frame_count !== undefined) payload.frame_count = Math.min(Math.max(Math.round(body.frame_count), 2), 16);
+    if (body.frame_duration_ms !== undefined) payload.frame_duration_ms = Math.max(Math.round(body.frame_duration_ms / 10) * 10, 20);
+  }
+  // Streaming partial previews keep the connection active; not available for GIF/SVG.
+  if (body.stream && format !== 'gif' && format !== 'svg') {
+    payload.stream = true;
+    payload.partial_images = Math.min(Math.max(body.partial_images ?? 2, 0), 3);
+  }
+  if (safetyIdentifier) payload.safety_identifier = safetyIdentifier;
+  return { payload, model, format: format || 'png' };
+}
+
+function imageResult(data: any, model: string, format: string) {
+  const mime = MIME[data.output_format || format] || 'image/png';
+  const images = (data.data || [])
+    .map((d: any) => (d.b64_json ? `data:${mime};base64,${d.b64_json}` : d.url))
+    .filter(Boolean);
+  if (!images.length) throw new HttpError(502, 'OpenAI returned no image. Try rephrasing the prompt.');
+  return {
+    images,
+    revisedPrompt: data.data?.[0]?.revised_prompt,
+    size: data.size,
+    quality: data.quality,
+    background: data.background,
+    outputFormat: data.output_format || format,
+    usage: data.usage,
+    provider: 'openai',
+    model,
+  };
+}
+
+async function callImages(endpoint: 'generations' | 'edits', payload: Record<string, unknown>, model: string, format: string) {
+  const key = OPENAI_KEY();
+  if (!key) throw new HttpError(503, 'Image generation requires OPENAI_API_KEY.');
+  const res = await fetch(`https://api.openai.com/v1/images/${endpoint}`, {
     method: 'POST',
     headers: { ...JSON_HEADERS, Authorization: `Bearer ${key}` },
     body: JSON.stringify(payload),
   });
   if (!res.ok) await providerError(res, 'OpenAI Images');
-  const data = await res.json();
-  const images = (data.data || []).map((d: any) =>
-    d.b64_json ? `data:image/png;base64,${d.b64_json}` : d.url,
-  );
-  const revisedPrompt = data.data?.[0]?.revised_prompt;
-  return { images, revisedPrompt, provider: 'openai', model };
+  if (payload.stream) {
+    // Pass OpenAI's server-sent events (partial_image / completed) straight through to the browser.
+    return new Response(res.body, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Image-Model': model },
+    });
+  }
+  return reply(imageResult(await res.json(), model, format));
+}
+
+function imageGenerate(body: ImageRequest, safetyIdentifier?: string) {
+  const { payload, model, format } = imagePayload(body, IMAGE_MODEL(), safetyIdentifier);
+  return callImages('generations', payload, model, format);
+}
+
+function imageEdit(body: ImageRequest, safetyIdentifier?: string) {
+  const images = (body.images || []).filter(Boolean);
+  if (!images.length) throw new HttpError(400, 'Add at least one image to edit.');
+  if (images.length > 16) throw new HttpError(400, 'You can send at most 16 images.');
+  if (body.mask && body.markup) throw new HttpError(400, 'Use either a mask or a markup overlay, not both.');
+  const { payload, model, format } = imagePayload(body, IMAGE_EDIT_MODEL(), safetyIdentifier);
+  payload.images = images.map((image_url) => ({ image_url }));
+  if (body.mask) payload.mask = { image_url: body.mask };
+  if (body.markup) payload.markup = { image_url: body.markup };
+  const fidelity = oneOf(body.input_fidelity, ['high', 'low'] as const, 'input_fidelity');
+  if (fidelity) payload.input_fidelity = fidelity;
+  return callImages('edits', payload, model, format);
 }
 
 async function transcribe(req: Request) {
@@ -344,7 +475,8 @@ function status() {
     configured: openai,
     primary: openai ? 'openai' : null,
     providers: { openai: { configured: openai, model: OPENAI_MODEL() } },
-    capabilities: { chat: openai, vision: openai, image: openai, transcribe: openai, embed: openai, tools: openai },
+    imageModels: { generate: IMAGE_MODEL(), edit: IMAGE_EDIT_MODEL(), available: IMAGE_MODELS },
+    capabilities: { chat: openai, vision: openai, image: openai, imageEdit: openai, webSearch: openai, transcribe: openai, embed: openai, tools: openai },
   };
 }
 
@@ -359,17 +491,19 @@ export default async (req: Request): Promise<Response> => {
     if (route === 'status' && req.method === 'GET') return reply(status());
     if (req.method !== 'POST') throw new HttpError(405, 'Method not allowed');
 
-    await checkAuth(req);
+    const sid = safetyId(await checkAuth(req));
 
     switch (route) {
       case 'chat':
-        return reply(await chat(await req.json()));
+        return reply(await chat({ ...(await req.json()), safetyIdentifier: sid }));
       case 'vision': {
         const body = await req.json();
-        return reply(await chat({ ...body, images: body.images || (body.image ? [body.image] : []) }));
+        return reply(await chat({ ...body, images: body.images || (body.image ? [body.image] : []), safetyIdentifier: sid }));
       }
       case 'image':
-        return reply(await image(await req.json()));
+        return await imageGenerate(await req.json(), sid);
+      case 'image-edit':
+        return await imageEdit(await req.json(), sid);
       case 'transcribe':
         return reply(await transcribe(req));
       case 'embed':

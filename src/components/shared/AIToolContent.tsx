@@ -10,6 +10,26 @@ interface AIToolContentProps {
   children?: ReactNode;
 }
 
+/**
+ * Render one line of model output as safe inline HTML: escape everything first
+ * (AI output can echo untrusted input), then add **bold**, `code` and http(s) links.
+ */
+export function formatInline(line: string): string {
+  const escaped = line
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  return escaped
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-indigo-600 underline">$1</a>',
+    )
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<span class="px-1 bg-indigo-50 text-indigo-700 rounded font-mono text-sm">$1</span>');
+}
+
 const AIToolContent: React.FC<AIToolContentProps> = ({
   isLoading,
   error,
@@ -135,7 +155,7 @@ const AIToolContent: React.FC<AIToolContentProps> = ({
                   return (
                     <div key={index} className="flex my-1.5">
                       <span className="font-bold text-indigo-600 mr-2 flex-shrink-0">{number}.</span>
-                      <p className="mt-0">{content}</p>
+                      <p className="mt-0" dangerouslySetInnerHTML={{ __html: formatInline(content) }}></p>
                     </div>
                   );
                 }
@@ -146,25 +166,16 @@ const AIToolContent: React.FC<AIToolContentProps> = ({
                   return (
                     <div key={index} className="flex items-start my-1.5">
                       <div className="h-2 w-2 rounded-full bg-indigo-500 mt-2 mr-2 flex-shrink-0"></div>
-                      <p className="mt-0">{content}</p>
+                      <p className="mt-0" dangerouslySetInnerHTML={{ __html: formatInline(content) }}></p>
                     </div>
                   );
                 }
                 
-                // Regular paragraphs with subtle highlights for important phrases
+                // Regular paragraphs
                 if (line.trim()) {
-                  // Highlight text in backticks
-                  // Escape model output before adding markup (AI output can echo untrusted input).
-                  const escaped = line
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;');
-                  const formattedText = escaped.replace(/`(.*?)`/g, '<span class="px-1 bg-indigo-50 text-indigo-700 rounded font-mono text-sm">$1</span>');
-                  
-                  return <p key={index} className="my-1.5" dangerouslySetInnerHTML={{ __html: formattedText }}></p>;
+                  return <p key={index} className="my-1.5" dangerouslySetInnerHTML={{ __html: formatInline(line) }}></p>;
                 }
-                
+
                 return <br key={index} />;
               })}
             </div>

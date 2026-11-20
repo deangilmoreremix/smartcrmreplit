@@ -1,18 +1,27 @@
 /**
- * Image generation via the server-side OpenAI gateway (/api/ai/image).
+ * GPT Image 2.6 generation and editing via the server-side gateway
+ * (/api/ai/image and /api/ai/image-edit → OpenAI Images API).
  */
-import { aiClient } from './aiClient';
+import { aiClient, type ImageOptions, type ImageEditOptions, type ImageResult } from './aiClient';
 
-export type ImageSize = '1024x1024' | '1792x1024' | '1024x1792';
-export type ImageQuality = 'standard' | 'hd';
-export type ImageStyle = 'natural' | 'vivid';
+export type { ImageOptions, ImageEditOptions, ImageResult };
+
+export const IMAGE_MODELS = [
+  { id: 'gpt-image-2.6-flare', name: 'Flare', description: 'Fast iteration — best for quick drafts and interactive use' },
+  { id: 'gpt-image-2.6-sunburst', name: 'Sunburst', description: 'Detailed compositions and consistent edits' },
+] as const;
 
 export const openaiImageService = {
-  async generateImage(prompt: string, size: ImageSize = '1024x1024', quality: ImageQuality = 'standard', style: ImageStyle = 'natural') {
-    const res = await aiClient.generateImage(prompt, { size, quality, style });
-    const url = res.images?.[0];
-    if (!url) throw new Error('No image was returned. Try rephrasing the prompt.');
-    return { url, revisedPrompt: res.revisedPrompt || prompt, model: res.model };
+  generate: (prompt: string, opts: ImageOptions = {}, onPartial?: (url: string, i: number) => void) =>
+    aiClient.streamImage('generate', prompt, opts, onPartial),
+
+  edit: (prompt: string, images: string[], opts: ImageEditOptions = {}, onPartial?: (url: string, i: number) => void) =>
+    aiClient.streamImage('edit', prompt, { ...opts, images }, onPartial),
+
+  /** Backwards-compatible single-image helper. */
+  async generateImage(prompt: string, size = '1024x1024', quality = 'auto') {
+    const res = await aiClient.generateImage(prompt, { size, quality: quality as ImageOptions['quality'] });
+    return { url: res.images[0], revisedPrompt: res.revisedPrompt || prompt, model: res.model };
   },
 };
 
