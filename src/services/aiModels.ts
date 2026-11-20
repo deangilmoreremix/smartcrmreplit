@@ -18,214 +18,49 @@ export interface AIModel {
 }
 
 export const AI_MODELS: Record<string, AIModel> = {
-  // Gemini 2.5 Flash Models
-  'gemini-2.5-flash': {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    provider: 'google-ai',
-    family: 'gemini',
-    version: '2.5',
-    contextWindow: 1048576, // 1M tokens
-    maxTokens: 8192,
-    pricing: {
-      input: 0.075, // $0.075 per 1M tokens
-      output: 0.30   // $0.30 per 1M tokens
-    },
-    capabilities: [
-      'text-generation',
-      'code-generation',
-      'reasoning',
-      'multimodal',
-      'function-calling',
-      'json-mode'
-    ],
-    description: 'Fast and versatile performance across a diverse variety of tasks. Optimized for speed and efficiency.',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash',
+  // All AI features run on OpenAI through the server-side gateway (/api/ai).
+  'gpt-4o-mini': {
+    id: 'gpt-4o-mini',
+    name: 'GPT-4o mini',
+    provider: 'openai',
+    family: 'gpt',
+    version: '4o-mini',
+    contextWindow: 128000,
+    maxTokens: 16384,
+    pricing: { input: 0.15, output: 0.6 },
+    capabilities: ['text-generation', 'reasoning', 'multimodal', 'function-calling', 'json-mode'],
+    description: 'Fast, low-cost default model for everyday CRM tasks (emails, summaries, scoring).',
+    apiEndpoint: '/api/ai/chat',
     isAvailable: true,
-    recommended: true
+    recommended: true,
   },
-  
-  'gemini-2.5-flash-8b': {
-    id: 'gemini-2.5-flash-8b',
-    name: 'Gemini 2.5 Flash 8B',
-    provider: 'google-ai',
-    family: 'gemini',
-    version: '2.5',
-    contextWindow: 1048576, // 1M tokens
-    maxTokens: 8192,
-    pricing: {
-      input: 0.0375, // $0.0375 per 1M tokens
-      output: 0.15   // $0.15 per 1M tokens
-    },
-    capabilities: [
-      'text-generation',
-      'code-generation',
-      'reasoning',
-      'multimodal',
-      'function-calling',
-      'json-mode'
-    ],
-    description: 'Smaller, faster, and more cost-effective version of Gemini 2.5 Flash. Great for high-volume applications.',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-8b',
-    isAvailable: true
-  },
-
-  // Gemma Models (via Gemini API)
-  'gemma-2-2b-it': {
-    id: 'gemma-2-2b-it',
-    name: 'Gemma 2 2B Instruction Tuned',
-    provider: 'google-ai',
-    family: 'gemma',
-    version: '2.0',
-    contextWindow: 8192,
-    maxTokens: 2048,
-    pricing: {
-      input: 0.035, // $0.035 per 1M tokens
-      output: 0.105  // $0.105 per 1M tokens
-    },
-    capabilities: [
-      'text-generation',
-      'instruction-following',
-      'conversation',
-      'lightweight'
-    ],
-    description: 'Lightweight, instruction-tuned model optimized for following instructions and conversations. Perfect for resource-constrained environments.',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemma-2-2b-it',
-    isAvailable: true
-  },
-
-  'gemma-2-9b-it': {
-    id: 'gemma-2-9b-it',
-    name: 'Gemma 2 9B Instruction Tuned',
-    provider: 'google-ai',
-    family: 'gemma',
-    version: '2.0',
-    contextWindow: 8192,
-    maxTokens: 2048,
-    pricing: {
-      input: 0.05,  // $0.05 per 1M tokens
-      output: 0.15  // $0.15 per 1M tokens
-    },
-    capabilities: [
-      'text-generation',
-      'instruction-following',
-      'reasoning',
-      'conversation',
-      'code-understanding'
-    ],
-    description: 'Balanced performance and efficiency. Excellent for complex reasoning tasks while maintaining good speed.',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemma-2-9b-it',
+  'gpt-4o': {
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    provider: 'openai',
+    family: 'gpt',
+    version: '4o',
+    contextWindow: 128000,
+    maxTokens: 16384,
+    pricing: { input: 2.5, output: 10 },
+    capabilities: ['text-generation', 'reasoning', 'multimodal', 'function-calling', 'json-mode', 'code-generation'],
+    description: 'Higher-quality model for complex analysis, proposals and long documents.',
+    apiEndpoint: '/api/ai/chat',
     isAvailable: true,
-    recommended: true
   },
-
-  'gemma-2-27b-it': {
-    id: 'gemma-2-27b-it',
-    name: 'Gemma 2 27B Instruction Tuned',
-    provider: 'google-ai',
-    family: 'gemma',
-    version: '2.0',
-    contextWindow: 8192,
-    maxTokens: 2048,
-    pricing: {
-      input: 0.125, // $0.125 per 1M tokens
-      output: 0.375 // $0.375 per 1M tokens
-    },
-    capabilities: [
-      'text-generation',
-      'instruction-following',
-      'advanced-reasoning',
-      'conversation',
-      'code-generation',
-      'complex-tasks'
-    ],
-    description: 'Most capable Gemma model with superior performance on complex reasoning and generation tasks.',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemma-2-27b-it',
-    isAvailable: true
-  },
-
-  // Legacy Gemini Models for completeness
-  'gemini-1.5-pro': {
-    id: 'gemini-1.5-pro',
-    name: 'Gemini 1.5 Pro',
-    provider: 'google-ai',
-    family: 'gemini',
-    version: '1.5',
-    contextWindow: 2097152, // 2M tokens
-    maxTokens: 8192,
-    pricing: {
-      input: 1.25,  // $1.25 per 1M tokens
-      output: 5.00  // $5.00 per 1M tokens
-    },
-    capabilities: [
-      'text-generation',
-      'code-generation',
-      'reasoning',
-      'multimodal',
-      'function-calling',
-      'long-context'
-    ],
-    description: 'Mid-size multimodal model with excellent performance across a variety of reasoning tasks.',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro',
-    isAvailable: true
-  },
-
-  'gemini-1.5-flash': {
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash',
-    provider: 'google-ai',
-    family: 'gemini',
-    version: '1.5',
-    contextWindow: 1048576, // 1M tokens
-    maxTokens: 8192,
-    pricing: {
-      input: 0.075, // $0.075 per 1M tokens
-      output: 0.30  // $0.30 per 1M tokens
-    },
-    capabilities: [
-      'text-generation',
-      'code-generation',
-      'reasoning',
-      'multimodal',
-      'function-calling'
-    ],
-    description: 'Fast and versatile performance across a diverse variety of tasks.',
-    apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash',
-    isAvailable: true
-  }
 };
 
 // Model categories for easier filtering
 export const MODEL_CATEGORIES = {
   RECOMMENDED: 'recommended',
-  GEMINI_FLASH: 'gemini-flash',
-  GEMMA: 'gemma',
-  LEGACY: 'legacy'
+  ALL: 'all',
 } as const;
 
 // Get models by category
-export const getModelsByCategory = (category: string): AIModel[] => {
-  switch (category) {
-    case MODEL_CATEGORIES.RECOMMENDED:
-      return Object.values(AI_MODELS).filter(model => model.recommended);
-    
-    case MODEL_CATEGORIES.GEMINI_FLASH:
-      return Object.values(AI_MODELS).filter(model => 
-        model.family === 'gemini' && model.id.includes('flash')
-      );
-    
-    case MODEL_CATEGORIES.GEMMA:
-      return Object.values(AI_MODELS).filter(model => model.family === 'gemma');
-    
-    case MODEL_CATEGORIES.LEGACY:
-      return Object.values(AI_MODELS).filter(model => 
-        model.family === 'gemini' && model.version === '1.5'
-      );
-    
-    default:
-      return Object.values(AI_MODELS);
-  }
-};
+export const getModelsByCategory = (category: string): AIModel[] =>
+  category === MODEL_CATEGORIES.RECOMMENDED
+    ? Object.values(AI_MODELS).filter((model) => model.recommended)
+    : Object.values(AI_MODELS);
 
 // Get model by ID
 export const getModelById = (id: string): AIModel | undefined => {
@@ -255,27 +90,34 @@ export const getFastestModels = (): AIModel[] => {
 };
 
 // Model selection helpers for different use cases
-export const AI_MODEL_RECOMMENDATIONS = {
-  // For CRM email generation
-  EMAIL_GENERATION: ['gemini-2.5-flash', 'gemma-2-9b-it'],
-  
-  // For business analysis
-  BUSINESS_ANALYSIS: ['gemini-2.5-flash', 'gemma-2-27b-it'],
-  
-  // For content creation
-  CONTENT_CREATION: ['gemini-2.5-flash', 'gemma-2-27b-it'],
-  
-  // For quick responses
-  QUICK_RESPONSES: ['gemini-2.5-flash-8b', 'gemma-2-2b-it'],
-  
-  // For complex reasoning
-  COMPLEX_REASONING: ['gemini-2.5-flash', 'gemma-2-27b-it', 'gemini-1.5-pro'],
-  
-  // For code generation
-  CODE_GENERATION: ['gemini-2.5-flash', 'gemma-2-27b-it'],
-  
-  // For multimodal tasks
-  MULTIMODAL: ['gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash']
+export const AI_MODEL_RECOMMENDATIONS: Record<string, string[]> = {
+  EMAIL_GENERATION: ['gpt-4o-mini'],
+  BUSINESS_ANALYSIS: ['gpt-4o', 'gpt-4o-mini'],
+  CONTENT_CREATION: ['gpt-4o-mini', 'gpt-4o'],
+  QUICK_RESPONSES: ['gpt-4o-mini'],
+  COMPLEX_REASONING: ['gpt-4o'],
+  CODE_GENERATION: ['gpt-4o'],
+  MULTIMODAL: ['gpt-4o', 'gpt-4o-mini'],
 };
 
-export type AIModelRecommendation = keyof typeof AI_MODEL_RECOMMENDATIONS;
+const PREFERRED_MODEL_KEY = 'smartcrm.ai.preferredModel';
+
+/** The user's preferred OpenAI model (sent to the gateway with each request). */
+export const getPreferredModel = (): string | undefined => {
+  try {
+    const id = localStorage.getItem(PREFERRED_MODEL_KEY) || undefined;
+    return id && AI_MODELS[id] ? id : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export const setPreferredModel = (id: string) => {
+  try {
+    localStorage.setItem(PREFERRED_MODEL_KEY, id);
+  } catch {
+    /* storage unavailable */
+  }
+};
+
+export type AIModelRecommendation = 'EMAIL_GENERATION' | 'BUSINESS_ANALYSIS' | 'CONTENT_CREATION' | 'QUICK_RESPONSES' | 'COMPLEX_REASONING' | 'CODE_GENERATION' | 'MULTIMODAL';

@@ -1,5 +1,5 @@
 import { enhancedGeminiService } from './enhancedGeminiService';
-import { openAIService } from './openAIService';
+import { openAIService } from './openAIChatService';
 
 // Feature types for orchestration
 export type AIFeature = 

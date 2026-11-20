@@ -149,7 +149,11 @@ async function openaiChat(body: ChatRequest) {
           role: 'user',
           content: [
             { type: 'text', text: messages[i].content || '' },
-            ...body.images.map((url) => ({ type: 'image_url', image_url: { url } })),
+            ...body.images.map((url, n) =>
+              url.startsWith('data:application/pdf')
+                ? { type: 'file', file: { filename: `document-${n + 1}.pdf`, file_data: url } }
+                : { type: 'image_url', image_url: { url } },
+            ),
           ],
         };
         break;
@@ -188,19 +192,27 @@ async function chat(body: ChatRequest) {
 // ---------------------------------------------------------------------------
 // Other endpoints
 // ---------------------------------------------------------------------------
-async function image(body: { prompt: string; size?: string; n?: number; quality?: string }) {
+async function image(body: { prompt: string; size?: string; n?: number; quality?: string; style?: string }) {
   const key = OPENAI_KEY();
   if (!key) throw new HttpError(503, 'Image generation requires OPENAI_API_KEY.');
   if (!body.prompt) throw new HttpError(400, 'prompt is required');
   const model = env('OPENAI_IMAGE_MODEL') || 'gpt-image-1';
+  const isGptImage = model.startsWith('gpt-image');
+  // gpt-image models use different size/quality values than DALL-E 3; map the UI's options.
+  const sizeMap: Record<string, string> = { '1792x1024': '1536x1024', '1024x1792': '1024x1536' };
+  const qualityMap: Record<string, string> = { standard: 'medium', hd: 'high' };
+  const size = body.size || '1024x1024';
   const payload: Record<string, unknown> = {
     model,
     prompt: body.prompt,
     n: Math.min(Math.max(body.n || 1, 1), 4),
-    size: body.size || '1024x1024',
+    size: isGptImage ? sizeMap[size] || size : size,
   };
-  if (body.quality) payload.quality = body.quality;
-  if (model.startsWith('dall-e')) payload.response_format = 'b64_json';
+  if (body.quality) payload.quality = isGptImage ? qualityMap[body.quality] || body.quality : body.quality;
+  if (!isGptImage) {
+    payload.response_format = 'b64_json';
+    if (body.style && model === 'dall-e-3') payload.style = body.style;
+  }
 
   const res = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
@@ -212,7 +224,8 @@ async function image(body: { prompt: string; size?: string; n?: number; quality?
   const images = (data.data || []).map((d: any) =>
     d.b64_json ? `data:image/png;base64,${d.b64_json}` : d.url,
   );
-  return { images, provider: 'openai', model };
+  const revisedPrompt = data.data?.[0]?.revised_prompt;
+  return { images, revisedPrompt, provider: 'openai', model };
 }
 
 async function transcribe(req: Request) {

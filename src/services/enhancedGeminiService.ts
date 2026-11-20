@@ -63,13 +63,13 @@ class EnhancedGeminiService {
   private async loadAvailableModels(): Promise<void> {
     try {
       // Get Google AI models (Gemini and Gemma)
-      const geminiModels = await supabaseAIService.getModelsByProvider('gemini');
+      const geminiModels = await supabaseAIService.getModelsByProvider('openai');
       this.availableModels = geminiModels;
     } catch (error) {
       console.warn('Error loading available models, using fallback configurations:', error);
       // Get fallback models for Google AI
       this.availableModels = supabaseAIService.getAllFallbackModels().filter(model => 
-        model.provider === 'gemini'
+        model.provider === 'openai'
       );
     }
   }

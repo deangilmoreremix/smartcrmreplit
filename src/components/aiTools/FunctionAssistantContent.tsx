@@ -96,12 +96,16 @@ const FunctionAssistantContent: React.FC = () => {
       const response = await functionService.salesAssistantWithFunctions(
         input.trim(),
         "You have access to this user's CRM data through functions.",
-        previousMessages
+        previousMessages,
+        enabledFunctions
       );
-      
-      // Process function calls that might have happened
-      // Note: In a real implementation, we'd track the actual function calls and results
-      // that were exchanged with OpenAI. For demo purposes, we'll simulate this.
+
+      if (response.functionCalls?.length) {
+        setFunctionLogs(prev => [
+          ...prev,
+          ...response.functionCalls.map(c => ({ name: c.name, arguments: c.arguments, result: c.result }))
+        ]);
+      }
       
       // Add assistant response
       const assistantMessage: Message = {

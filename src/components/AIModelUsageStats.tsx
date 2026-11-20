@@ -24,32 +24,8 @@ const AIModelUsageStats: React.FC<AIModelUsageStatsProps> = ({
 }) => {
   const { isDark } = useTheme();
 
-  // Demo data if no usage provided
-  const demoUsage: ModelUsage[] = [
-    {
-      modelId: 'gemini-2.5-flash',
-      requests: 145,
-      tokensUsed: 87500,
-      cost: 8.75,
-      avgResponseTime: 1.2
-    },
-    {
-      modelId: 'gemma-2-9b-it',
-      requests: 89,
-      tokensUsed: 42300,
-      cost: 3.45,
-      avgResponseTime: 0.8
-    },
-    {
-      modelId: 'gemini-2.5-flash-8b',
-      requests: 67,
-      tokensUsed: 33200,
-      cost: 2.10,
-      avgResponseTime: 0.6
-    }
-  ];
-
-  const stats = usage.length > 0 ? usage : demoUsage;
+  // Real usage only: no placeholder numbers.
+  const stats = usage;
   const totalCost = stats.reduce((sum, stat) => sum + stat.cost, 0);
   const totalRequests = stats.reduce((sum, stat) => sum + stat.requests, 0);
   const totalTokens = stats.reduce((sum, stat) => sum + stat.tokensUsed, 0);
@@ -168,6 +144,9 @@ const AIModelUsageStats: React.FC<AIModelUsageStatsProps> = ({
         </div>
         
         <div className="divide-y divide-white/10">
+          {stats.length === 0 && (
+            <p className={`text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>No AI usage recorded yet.</p>
+          )}
           {stats.map((stat) => {
             const model = AI_MODELS[stat.modelId];
             if (!model) return null;
@@ -180,7 +159,7 @@ const AIModelUsageStats: React.FC<AIModelUsageStatsProps> = ({
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center space-x-3">
                     <div className={`p-2 rounded-lg ${
-                      model.family === 'gemini' 
+                      model.family === 'gpt' 
                         ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600')
                         : (isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600')
                     }`}>

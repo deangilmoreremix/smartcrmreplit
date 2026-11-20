@@ -7,7 +7,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { enhancedGeminiService } from '../services/enhancedGeminiService';
 import { supabaseAIService } from '../services/supabaseAIService';
 import { aiOrchestratorService } from '../services/aiOrchestratorService';
-import { openAIService } from '../services/openAIService';
+import { openAIService } from '../services/openAIChatService';
 import { Contact } from '../types/contact';
 
 // Define types for task optimization

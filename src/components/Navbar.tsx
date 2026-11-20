@@ -1,6 +1,7 @@
 // src/components/Navbar.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { AI_TOOLS } from './aiTools/registry';
 import {
   ChevronDown, User, Bell, Search, BarChart3, Users, Target, MessageSquare, Video, FileText, Zap,
   TrendingUp, Calendar, Phone, Receipt, BookOpen, Mic, Sun, Moon, Brain, Mail, Grid3X3, Briefcase,
@@ -21,8 +22,8 @@ interface NavbarProps {
 
 type AITool = {
   title: string;
-  id: string;       // must match AITools.tsx switch cases
-  icon?: React.ComponentType<{ size?: number; className?: string }>;
+  id: string;       // must match an id in components/aiTools/registry.tsx
+  icon?: React.ComponentType<any>;
   category?: string;
 };
 
@@ -124,43 +125,9 @@ const Navbar: React.FC<NavbarProps> = React.memo(({ onOpenPipelineModal }) => {
     { name: 'White-Label Customization', url: '/white-label', icon: Palette, isExternal: false }
   ];
 
-  // ===== All AI tool entries (IDs MUST MATCH AITools.tsx switch cases) =====
-  const aiTools: AITool[] = [
-    { title: 'Smart Email Composer', id: 'email-composer-content', icon: Mail, category: 'Email' },
-    { title: 'AI Assistant Chat', id: 'ai-assistant-chat', icon: Brain, category: 'Assistant' },
-    { title: 'Live Deal Analysis', id: 'live-deal-analysis', icon: BarChart3, category: 'Sales' },
-    { title: 'Auto Form Completer', id: 'auto-form-completer', icon: Zap, category: 'Forms' },
-    { title: 'Call Script (Content)', id: 'call-script', icon: Phone, category: 'Sales' },
-    { title: 'Call Script Generator', id: 'call-script-generator', icon: Phone, category: 'Sales' },
-    { title: 'Competitor Analysis (Content)', id: 'competitor-analysis', icon: Shield, category: 'Research' },
-    { title: 'Competitor Analysis (Main)', id: 'competitor-analysis-main', icon: Shield, category: 'Research' },
-    { title: 'Customer Persona', id: 'customer-persona', icon: Users, category: 'Research' },
-    { title: 'Document Analyzer (Realtime)', id: 'document-analyzer-realtime', icon: FileText, category: 'Docs' },
-    { title: 'Email Analysis', id: 'email-analysis', icon: Mail, category: 'Email' },
-    { title: 'Function Assistant', id: 'function-assistant', icon: Code, category: 'Developer' },
-    { title: 'Image Generator (Content)', id: 'image-generator', icon: Image, category: 'Content' },
-    { title: 'Instant AI Response', id: 'instant-response', icon: Zap, category: 'Assistant' },
-    { title: 'Market Trends (Content)', id: 'market-trends', icon: TrendingUp, category: 'Research' },
-    { title: 'Meeting Agenda', id: 'meeting-agenda', icon: Calendar, category: 'Meetings' },
-    { title: 'Meeting Summary', id: 'meeting-summary', icon: Calendar, category: 'Meetings' },
-    { title: 'Objection Handler', id: 'objection-handler', icon: AlertTriangle, category: 'Sales' },
-    { title: 'Realtime Email Composer', id: 'realtime-email-composer', icon: Mail, category: 'Email' },
-    { title: 'Realtime Form Validation', id: 'form-validation', icon: CheckSquare, category: 'Forms' },
-    { title: 'Reasoning Email (Content)', id: 'reasoning-email', icon: Mail, category: 'Reasoning' },
-    { title: 'Reasoning Proposal', id: 'reasoning-proposal-generator', icon: FileText, category: 'Reasoning' },
-    { title: 'Reasoning Script', id: 'reasoning-script-generator', icon: Phone, category: 'Reasoning' },
-    { title: 'Reasoning Objection', id: 'reasoning-objection-handler', icon: AlertTriangle, category: 'Reasoning' },
-    { title: 'Reasoning Social', id: 'reasoning-social-content', icon: Megaphone, category: 'Reasoning' },
-    { title: 'Semantic Search (Realtime)', id: 'smart-search-realtime', icon: Search, category: 'Search' },
-    { title: 'Social Media Generator', id: 'social-media-generator', icon: Megaphone, category: 'Content' },
-    { title: 'Voice Analysis (Realtime)', id: 'voice-analysis-realtime', icon: Volume2, category: 'Audio' },
-    { title: 'Visual Content Generator', id: 'visual-content-generator', icon: Image, category: 'Content' },
-    { title: 'Churn Prediction', id: 'churn-prediction', icon: PieChart, category: 'Analytics' },
-    { title: 'Proposal Generator', id: 'proposal-generator', icon: FileText, category: 'Sales' },
-    { title: 'Sentiment Analysis', id: 'sentiment-analysis', icon: LineChart, category: 'Analytics' },
-    { title: 'AI Usage Stats Panel', id: 'ai-usage-stats-panel', icon: Eye, category: 'Analytics' },
-    { title: 'Market Trends (Analysis)', id: 'market-trends-analysis', icon: TrendingUp, category: 'Analytics' },
-  ];
+  // AI tool entries come from the shared registry so ids always match the /ai-tools hub.
+  const aiTools: AITool[] = AI_TOOLS.map(t => ({ title: t.title, id: t.id, icon: t.icon, category: t.category }));
+
 
   // Click outside to close
   useEffect(() => {

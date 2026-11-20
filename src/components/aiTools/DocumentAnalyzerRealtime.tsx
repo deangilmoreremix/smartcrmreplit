@@ -15,6 +15,7 @@ const DocumentAnalyzerRealtime: React.FC<DocumentAnalyzerRealtimeProps> = ({
 }) => {
   const vision = useOpenAIVision();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -68,6 +69,7 @@ const DocumentAnalyzerRealtime: React.FC<DocumentAnalyzerRealtimeProps> = ({
         // Create URL for the uploaded file
         const objectUrl = URL.createObjectURL(file);
         setImageUrl(objectUrl);
+        setFile(file);
       }
     }
   });
@@ -83,96 +85,19 @@ const DocumentAnalyzerRealtime: React.FC<DocumentAnalyzerRealtimeProps> = ({
     setCurrentAnalysisStep(analysisSteps[analysisType][0]);
     setError(null);
     
-    // Simulate progressive analysis with steps
-    const totalSteps = analysisSteps[analysisType].length;
-    for (let i = 0; i < totalSteps; i++) {
-      setCurrentAnalysisStep(analysisSteps[analysisType][i]);
-      setAnalysisProgress(Math.round((i / (totalSteps - 1)) * 100));
-      // Add a delay between steps to simulate processing
-      await new Promise(resolve => setTimeout(resolve, 700));
-    }
-    
+    // Step labels advance while the real request runs.
+    const steps = analysisSteps[analysisType];
+    let step = 0;
+    const ticker = setInterval(() => {
+      step = Math.min(step + 1, steps.length - 1);
+      setCurrentAnalysisStep(steps[step]);
+      setAnalysisProgress(Math.min(90, Math.round((step / steps.length) * 100)));
+    }, 1200);
+
     try {
-      // In a real implementation, call OpenAI Vision API
-      // For the demo, simulate a response after the progress animation
-      await new Promise(resolve => setTimeout(resolve, 700));
-      
-      // Simulate analysis results based on document type
-      let result;
-      switch(analysisType) {
-        case 'document':
-          result = {
-            summary: "This document outlines a proposal for implementing a new CRM system with integrated AI capabilities. It includes technical requirements, implementation timeline, and pricing options.",
-            keyPoints: [
-              "Implementation timeline: 8-10 weeks",
-              "Budget: $75,000 - $95,000",
-              "Key requirements: Data migration, API integration, custom reporting",
-              "Decision deadline: July 15, 2025"
-            ],
-            recommendations: [
-              "Focus on the AI features that address their specific pain points",
-              "Provide case studies from similar industry implementations",
-              "Highlight shorter implementation timeline compared to competitors",
-              "Prepare technical documentation for IT stakeholders"
-            ]
-          };
-          break;
-          
-        case 'competitor':
-          result = {
-            summary: "This is a marketing brochure from CompeteCRM highlighting their enterprise solution with AI capabilities and integration features.",
-            keyPoints: [
-              "Pricing: $1,200/user/year for enterprise tier",
-              "Key features: Basic AI analytics, email templates, workflow automation",
-              "Implementation time advertised: 12 weeks",
-              "Target market: Mid-market companies (100-500 employees)"
-            ],
-            competitorStrengths: [
-              "Strong industry-specific templates",
-              "Established marketplace with 200+ integrations",
-              "24/7 phone support included in enterprise tier"
-            ],
-            recommendations: [
-              "Emphasize our superior AI capabilities and real-time insights",
-              "Highlight our faster implementation time (8 weeks vs. their 12)",
-              "Focus on our more intuitive UI and user-friendly design",
-              "Showcase our stronger data security certifications"
-            ]
-          };
-          break;
-          
-        case 'contract':
-          result = {
-            summary: "This is a service agreement for CRM implementation services with standard terms and conditions, payment schedule, and deliverables.",
-            keyPoints: [
-              "Contract duration: 12 months with auto-renewal clause",
-              "Payment terms: 50% upfront, 25% at midpoint, 25% upon completion",
-              "Service level agreement: 99.9% uptime guarantee",
-              "Termination clause: 60-day written notice required"
-            ],
-            contractTerms: [
-              "Section 3.2: Client responsible for data quality and migration assistance",
-              "Section 5.1: Early termination fee of 25% of remaining contract value",
-              "Section 7.3: Intellectual property ownership remains with vendor",
-              "Section 9.1: Change requests may incur additional fees"
-            ],
-            riskLevel: 'medium',
-            recommendations: [
-              "Negotiate the auto-renewal clause to require affirmative renewal",
-              "Request more favorable payment terms (e.g., 25/50/25)",
-              "Clarify specifics around 'additional fees' in section 9.1",
-              "Ensure data ownership and export capability is clearly defined"
-            ]
-          };
-          break;
-          
-        default:
-          result = {
-            summary: "Document analysis complete.",
-            keyPoints: ["No specific details extracted."]
-          };
-      }
-      
+      if (!file) throw new Error('Please upload an image or document first');
+      const result = await vision.analyzeDocument(file, analysisType);
+      clearInterval(ticker);
       setAnalysisResult(result);
       setAnalysisProgress(100);
       setShowResult(true);
@@ -181,8 +106,9 @@ const DocumentAnalyzerRealtime: React.FC<DocumentAnalyzerRealtimeProps> = ({
         onAnalysisComplete(result);
       }
     } catch (error) {
+      clearInterval(ticker);
       console.error("Error analyzing document:", error);
-      setError("Failed to analyze document. Please try again.");
+      setError(error instanceof Error ? error.message : "Failed to analyze document. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -217,6 +143,7 @@ const DocumentAnalyzerRealtime: React.FC<DocumentAnalyzerRealtimeProps> = ({
   
   const resetAnalysis = () => {
     setImageUrl(null);
+    setFile(null);
     setAnalysisResult(null);
     setShowResult(false);
     setError(null);

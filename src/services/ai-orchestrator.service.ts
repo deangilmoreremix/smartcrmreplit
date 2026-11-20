@@ -4,10 +4,10 @@
  */
 
 import { logger } from './logger.service';
+import { aiClient } from './aiClient';
 import { cacheService } from './cache.service';
 import { rateLimiter } from './rate-limiter.service';
 import { httpClient } from './http-client.service';
-import { supabase } from '../lib/supabase';
 import { Contact } from '../types/contact';
 
 export interface AIRequest {
@@ -25,7 +25,7 @@ export interface AIRequest {
   };
   options?: {
     useCache?: boolean;
-    provider?: 'openai' | 'gemini' | 'auto';
+    provider?: 'openai' | 'auto';
     model?: string;
     timeout?: number;
   };
@@ -48,7 +48,7 @@ export interface AIResponse {
 }
 
 export interface AIProvider {
-  name: 'openai' | 'gemini';
+  name: 'openai';
   available: boolean;
   rateLimit: {
     remaining: number;
@@ -74,18 +74,12 @@ class AIOrchestrator {
 
   private initializeProviders(): void {
     // Initialize provider status
+    // All AI runs on OpenAI through the server-side gateway (/api/ai); keys never reach the browser.
     this.providers.set('openai', {
       name: 'openai',
-      available: !!import.meta.env.VITE_OPENAI_API_KEY,
+      available: true,
       rateLimit: { remaining: 50, resetTime: Date.now() + 60000 },
       performance: { avgResponseTime: 2000, successRate: 0.95, costPer1kTokens: 0.002 }
-    });
-
-    this.providers.set('gemini', {
-      name: 'gemini',
-      available: !!import.meta.env.VITE_GEMINI_API_KEY,
-      rateLimit: { remaining: 60, resetTime: Date.now() + 60000 },
-      performance: { avgResponseTime: 1500, successRate: 0.92, costPer1kTokens: 0.0005 }
     });
   }
 
@@ -239,7 +233,7 @@ class AIOrchestrator {
           break;
         case 'automation_suggestions':
           // Gemini is good for simple automation logic
-          if (provider.name === 'gemini') score += 5;
+          
           break;
       }
 
@@ -255,38 +249,36 @@ class AIOrchestrator {
     return scoredProviders.sort((a, b) => b.score - a.score)[0].provider;
   }
 
-  private async callProvider(provider: AIProvider, request: AIRequest): Promise<any> {
-    // Map request types to edge function endpoints
-    const endpointMap: Record<string, string> = {
-      'contact_scoring': 'analyze-sentiment',
-      'contact_enrichment': 'natural-language-query',
-      'email_generation': 'draft-email-response',
-      'email_analysis': 'analyze-sentiment',
-      'insights_generation': 'prioritize-tasks',
-      'communication_analysis': 'summarize-customer-notes',
-      'automation_suggestions': 'generate-sales-pitch',
-      'predictive_analytics': 'natural-language-query',
-      'relationship_mapping': 'natural-language-query'
+  private async callProvider(_provider: AIProvider, request: AIRequest): Promise<any> {
+    const shapes: Record<AIRequest['type'], string> = {
+      contact_scoring:
+        '{"score":0-100,"breakdown":{"engagement":0-100,"fit":0-100,"intent":0-100,"timing":0-100},"reasoning":["..."],"recommendations":["..."],"nextBestActions":["..."]}',
+      contact_enrichment: '{"enrichedData":{},"confidence":0-100,"sources":["inferred"],"notes":"..."}',
+      email_generation:
+        '{"subject":"...","body":"...","tone":"...","personalization":{"score":0-100,"elements":["..."]},"optimization":{"score":0-100,"suggestions":["..."]}}',
+      email_analysis:
+        '{"scores":{"sentiment":-1..1,"urgency":0-100,"engagement":0-100},"summary":"...","keyPoints":["..."],"suggestedActions":["..."]}',
+      insights_generation:
+        '{"insights":[{"type":"opportunity|risk|recommendation|prediction","title":"...","description":"...","confidence":0-100,"impact":"low|medium|high","actionable":true,"suggestedActions":["..."]}]}',
+      communication_analysis: '{"summary":"...","sentiment":"positive|neutral|negative","keyTopics":["..."],"actionItems":["..."],"scores":{}}',
+      automation_suggestions: '{"suggestions":[{"title":"...","description":"...","trigger":"...","actions":["..."],"impact":"low|medium|high"}]}',
+      predictive_analytics:
+        '{"predictions":[{"metric":"...","value":"...","probability":0-100,"timeframe":"..."}],"trendAnalysis":{"direction":"up|down|stable","confidence":0-100,"factors":["..."]},"optimalActions":["..."]}',
+      relationship_mapping:
+        '{"relationships":[{"contactId":"...","type":"...","strength":0-100}],"networkInsights":["..."],"influenceMap":{}}',
     };
+    const shape = shapes[request.type];
+    if (!shape) throw new Error(`Unsupported AI request type: ${request.type}`);
 
-    const endpoint = endpointMap[request.type];
-    if (!endpoint) {
-      throw new Error(`No endpoint mapping for request type: ${request.type}`);
-    }
+    const result = await aiClient.json(
+      `Task: ${request.type.replace(/_/g, ' ')}
+${request.context?.businessContext ? `Business context: ${request.context.businessContext}\n` : ''}Input data:
+${JSON.stringify(request.data, null, 2).slice(0, 12000)}
 
-    // Use Supabase client to invoke edge functions
-    const { data, error } = await supabase.functions.invoke(endpoint, {
-      body: {
-        ...request.data,
-        model: provider.name === 'openai' ? 'gpt-3.5-turbo' : 'gemini-1.5-flash'
-      }
-    });
-
-    if (error) {
-      throw new Error(`Edge function error: ${error.message}`);
-    }
-
-    return data;
+Return JSON with exactly this shape: ${shape}`,
+      { system: 'You are the AI engine of a CRM. Base every answer on the input data; do not invent facts.', temperature: 0.3 }
+    );
+    return { result, model: 'openai', confidence: 85 };
   }
 
   private updateProviderPerformance(providerName: string, metadata: AIResponse['metadata']): void {
@@ -301,7 +293,7 @@ class AIOrchestrator {
     // Update rate limit info (simplified)
     provider.rateLimit.remaining = Math.max(0, provider.rateLimit.remaining - 1);
     if (Date.now() > provider.rateLimit.resetTime) {
-      provider.rateLimit.remaining = provider.name === 'openai' ? 50 : 60;
+      provider.rateLimit.remaining = 50;
       provider.rateLimit.resetTime = Date.now() + 60000;
     }
   }

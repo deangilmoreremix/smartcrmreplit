@@ -388,13 +388,8 @@ class AIIntegrationService {
         return [
           { 
             name: 'openai', 
-            status: import.meta.env.VITE_OPENAI_API_KEY ? 'available' : 'error',
+            status: 'available',
             remaining: 45 
-          },
-          { 
-            name: 'gemini', 
-            status: import.meta.env.VITE_GEMINI_API_KEY ? 'available' : 'error',
-            remaining: 50 
           }
         ];
       }

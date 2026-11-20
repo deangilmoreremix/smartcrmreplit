@@ -187,7 +187,7 @@ const AIAssistantChat: React.FC<AIAssistantChatProps> = ({ assistantId: propAssi
         setRunId(null);
         setIsLoading(false);
       } else if (run.status === 'failed') {
-        setError('The assistant encountered an error');
+        setError(run.error || 'The assistant encountered an error');
         setRunId(null);
         setIsLoading(false);
       }

@@ -154,7 +154,13 @@ const AIToolContent: React.FC<AIToolContentProps> = ({
                 // Regular paragraphs with subtle highlights for important phrases
                 if (line.trim()) {
                   // Highlight text in backticks
-                  const formattedText = line.replace(/`(.*?)`/g, '<span class="px-1 bg-indigo-50 text-indigo-700 rounded font-mono text-sm">$1</span>');
+                  // Escape model output before adding markup (AI output can echo untrusted input).
+                  const escaped = line
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+                  const formattedText = escaped.replace(/`(.*?)`/g, '<span class="px-1 bg-indigo-50 text-indigo-700 rounded font-mono text-sm">$1</span>');
                   
                   return <p key={index} className="my-1.5" dangerouslySetInnerHTML={{ __html: formattedText }}></p>;
                 }

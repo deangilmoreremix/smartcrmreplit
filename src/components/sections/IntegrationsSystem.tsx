@@ -1,19 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Grid3X3, Settings, Cpu } from 'lucide-react';
 import ConnectedApps from '../dashboard/ConnectedApps';
 import AIModelSelector from '../AIModelSelector';
+import { getAIStatus } from '../../services/aiClient';
+import { getPreferredModel, setPreferredModel } from '../../services/aiModels';
 
 const IntegrationsSystem: React.FC = () => {
   const { isDark } = useTheme();
 
-  // Check for API keys
-  const googleApiKey = import.meta.env.VITE_GOOGLE_AI_API_KEY;
-  const openAiApiKey = import.meta.env.VITE_OPENAI_API_KEY;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  
-  const isGoogleConnected = !!googleApiKey && googleApiKey.length > 10 && !googleApiKey.includes('your_');
-  const isOpenAIConnected = !!openAiApiKey && openAiApiKey.length > 10 && !openAiApiKey.includes('your_');
+  // OpenAI is configured server-side (OPENAI_API_KEY in Netlify); ask the AI gateway.
+  const [isOpenAIConnected, setIsOpenAIConnected] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(getPreferredModel() || 'gpt-4o-mini');
+  useEffect(() => {
+    getAIStatus()
+      .then((s) => setIsOpenAIConnected(s.configured))
+      .catch(() => setIsOpenAIConnected(false));
+  }, []);
   const isSupabaseConnected = !!supabaseUrl && supabaseUrl.includes('supabase.co');
 
   return (
@@ -52,8 +56,11 @@ const IntegrationsSystem: React.FC = () => {
               Select the default model for general AI operations
             </p>
             <AIModelSelector 
-              selectedModel="gemini-2.5-flash"
-              onModelChange={() => {}}
+              selectedModel={selectedModel}
+              onModelChange={(id) => {
+                setSelectedModel(id);
+                setPreferredModel(id);
+              }}
               className="w-full"
             />
           </div>
@@ -64,20 +71,6 @@ const IntegrationsSystem: React.FC = () => {
             <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
               Configure external API connections
             </p>
-            
-            <div className={`p-3 ${isDark ? 'bg-white/5' : 'bg-gray-100'} rounded-lg flex items-center justify-between mb-3`}>
-              <div className="flex items-center space-x-2">
-                <Cpu size={16} className={isDark ? 'text-blue-400' : 'text-blue-600'} />
-                <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Google AI API</span>
-              </div>
-              <div className={`px-2 py-1 rounded text-xs ${
-                isGoogleConnected
-                  ? (isDark ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700')
-                  : (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700')
-              }`}>
-                {isGoogleConnected ? 'Connected' : 'Not Connected'}
-              </div>
-            </div>
             
             <div className={`p-3 ${isDark ? 'bg-white/5' : 'bg-gray-100'} rounded-lg flex items-center justify-between mb-3`}>
               <div className="flex items-center space-x-2">

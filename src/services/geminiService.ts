@@ -75,6 +75,17 @@ export const useGemini = () => ({
   analyzeMarketTrends: async (industry: string, targetMarket = 'general', timeframe = '12 months') =>
     aiContent.analyzeMarketTrends(industry, targetMarket, timeframe),
 
+  /**
+   * Adapter for code written against the Google SDK shape
+   * (`getGenerativeModel().generateContent(prompt).response.text()`); runs on OpenAI.
+   */
+  getGenerativeModel: (_opts?: { model?: string }) => ({
+    generateContent: async (prompt: string) => {
+      const text = await aiClient.text(prompt, { temperature: 0.4 });
+      return { response: { text: () => text } };
+    },
+  }),
+
   getAvailableModels: async () => MODELS,
   getRecommendedModel: async (_useCase: string) => MODELS[0],
 });

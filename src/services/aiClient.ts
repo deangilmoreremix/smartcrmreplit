@@ -5,6 +5,7 @@
  * live only on the server; the browser sends the user's Supabase session token.
  */
 import { supabase } from '../lib/supabase';
+import { getPreferredModel } from './aiModels';
 
 export type AIProvider = 'openai';
 
@@ -62,6 +63,10 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 async function request<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
+  if (init.json && typeof init.json === 'object' && !(init.json as any).model) {
+    const model = getPreferredModel();
+    if (model) init = { ...init, json: { ...(init.json as object), model } };
+  }
   const headers: Record<string, string> = { ...(await authHeaders()) };
   let body = init.body;
   if (init.json !== undefined) {
@@ -135,8 +140,11 @@ export const aiClient = {
     return res;
   },
 
-  async generateImage(prompt: string, opts: { size?: string; n?: number; quality?: string } = {}) {
-    return request<{ images: string[]; model: string }>('image', { method: 'POST', json: { prompt, ...opts } });
+  async generateImage(prompt: string, opts: { size?: string; n?: number; quality?: string; style?: string } = {}) {
+    return request<{ images: string[]; revisedPrompt?: string; model: string }>('image', {
+      method: 'POST',
+      json: { prompt, ...opts },
+    });
   },
 
   async transcribe(file: Blob, filename = 'audio.webm'): Promise<string> {

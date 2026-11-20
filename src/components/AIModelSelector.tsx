@@ -59,9 +59,6 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
     if (model.recommended) {
       return { text: 'Popular', color: 'bg-blue-500/20 text-blue-400' };
     }
-    if (model.family === 'gemma') {
-      return { text: 'Lightweight', color: 'bg-orange-500/20 text-orange-400' };
-    }
     return null;
   };
 
@@ -78,7 +75,7 @@ const AIModelSelector: React.FC<AIModelSelectorProps> = ({
       >
         <div className="flex items-center space-x-3">
           <div className={`p-2 rounded-lg ${
-            currentModel?.family === 'gemini' 
+            currentModel?.family === 'gpt' 
               ? (isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600')
               : (isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-600')
           }`}>
